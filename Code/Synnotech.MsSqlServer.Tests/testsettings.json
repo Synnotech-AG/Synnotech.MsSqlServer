@@ -1,0 +1,8 @@
+{
+    // Do not adjust these settings. Instead, create a file called testsettings.Development.json where you
+    // can override the settings in this file.
+    "database": {
+        "areTestsEnabled": false,
+        "connectionString": "Server=(localdb)\\MsSqlLocalDb; Database=MsSqlServerIntegrationTests; Integrated Security=True"
+    }
+}

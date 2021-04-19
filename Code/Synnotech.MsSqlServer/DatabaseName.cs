@@ -29,7 +29,7 @@ namespace Synnotech.MsSqlServer
         /// Checks if the specified instance is equal to this one.
         /// </summary>
         public bool Equals(DatabaseName other) =>
-            _databaseName == other._databaseName;
+            StringComparer.CurrentCultureIgnoreCase.Equals(_databaseName, other._databaseName);
 
         /// <summary>
         /// Checks if the specified object is an instance of <see cref="DatabaseName" />
@@ -41,7 +41,7 @@ namespace Synnotech.MsSqlServer
         /// <summary>
         /// Returns the hash code of the database name.
         /// </summary>
-        public override int GetHashCode() => _databaseName.GetHashCode();
+        public override int GetHashCode() => StringComparer.CurrentCultureIgnoreCase.GetHashCode(_databaseName);
 
         /// <summary>
         /// Returns the database name.

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
         <TargetFramework>net5.0</TargetFramework>
@@ -7,12 +7,27 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\Synnotech.MsSqlServer\Synnotech.MsSqlServer.csproj" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.9.4" />
         <PackageReference Include="xunit" Version="2.4.1" />
         <PackageReference Include="xunit.runner.visualstudio" Version="2.4.3">
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
             <PrivateAssets>all</PrivateAssets>
         </PackageReference>
+        <PackageReference Include="FluentAssertions" Version="5.10.3" />
+        <PackageReference Include="Synnotech.Xunit" Version="1.1.0" />
+        <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="5.0.0" />
+        <PackageReference Include="Light.GuardClauses" Version="9.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="testsettings.json">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
+        <None Update="testsettings.Development.json" Condition="Exists('testsettings.Development.json')">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+        </None>
     </ItemGroup>
 
 </Project>

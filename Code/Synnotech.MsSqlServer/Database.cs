@@ -14,7 +14,8 @@ namespace Synnotech.MsSqlServer
     public static class Database
     {
         /// <summary>
-        /// Tries to create the database the specified connection string points to.
+        /// Tries to create the database the specified connection string points to. If
+        /// the target database already exists, nothing will be done.
         /// This method will connect to the "master" database of the target
         /// SQL server to do this - please ensure that the credentials in the connection string
         /// have enough privileges to perform this operation.
@@ -25,7 +26,7 @@ namespace Synnotech.MsSqlServer
         /// <exception cref="FormatException">Invalid value within the connection string (specifically, when a Boolean or numeric value was expected but not supplied).</exception>
         /// <exception cref="ArgumentException">The supplied connectionString is not valid.</exception>
         /// <exception cref="SqlException">Thrown when the connection to the master database fails or when the command fails to execute.</exception>
-        public static async Task<bool> TryCreateDatabase(string connectionString)
+        public static async Task TryCreateDatabaseAsync(string connectionString)
         {
             var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
             DatabaseName targetDatabaseName = connectionStringBuilder.InitialCatalog;
@@ -39,11 +40,13 @@ namespace Synnotech.MsSqlServer
                 new SqlConnection(connectionStringBuilder.ConnectionString);
 
             await connectionToMaster.OpenAsync();
-            return await connectionToMaster.TryCreateDatabaseAsync(targetDatabaseName);
+            await connectionToMaster.TryCreateDatabaseAsync(targetDatabaseName);
         }
 
         /// <summary>
-        /// Tries to drop the database the specified connection string points to.
+        /// Tries to drop the database the specified connection string points to. All existing
+        /// connections to the database will be terminated. If the database does not exist, nothing
+        /// will happen.
         /// This method will connect to the "master" database of the target
         /// SQL server to do this - please ensure that the credentials in the connection string
         /// have enough privileges to perform this operation.
@@ -54,7 +57,7 @@ namespace Synnotech.MsSqlServer
         /// <exception cref="FormatException">Invalid value within the connection string (specifically, when a Boolean or numeric value was expected but not supplied).</exception>
         /// <exception cref="ArgumentException">The supplied connectionString is not valid.</exception>
         /// <exception cref="SqlException">Thrown when the connection to the master database fails or when the command fails to execute.</exception>
-        public static async Task<bool> TryDropDatabase(string connectionString)
+        public static async Task TryDropDatabaseAsync(string connectionString)
         {
             var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
             DatabaseName targetDatabaseName = connectionStringBuilder.InitialCatalog;
@@ -68,7 +71,7 @@ namespace Synnotech.MsSqlServer
 
             await connectionToMaster.OpenAsync();
             await connectionToMaster.KillAllDatabaseConnectionsAsync(targetDatabaseName);
-            return await connectionToMaster.TryDropDatabaseAsync(targetDatabaseName);
+            await connectionToMaster.TryDropDatabaseAsync(targetDatabaseName);
         }
 
         /// <summary>
@@ -114,7 +117,7 @@ namespace Synnotech.MsSqlServer
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
         /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
-        public static async Task<bool> KillAllDatabaseConnectionsAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
+        public static async Task KillAllDatabaseConnectionsAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
         {
             connectionToMaster.MustNotBeNull(nameof(connectionToMaster));
             databaseName.MustNotBeDefault(nameof(databaseName));
@@ -134,8 +137,7 @@ WHERE database_id = db_id('{databaseName}');
 
 EXEC(@kill);
 ";
-            var result = await command.ExecuteNonQueryAsync(cancellationToken);
-            return result > 0;
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
         /// <summary>
@@ -151,7 +153,7 @@ EXEC(@kill);
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
         /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
-        public static async Task<bool> DropAndCreateDatabaseAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
+        public static async Task DropAndCreateDatabaseAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
         {
             connectionToMaster.MustNotBeNull(nameof(connectionToMaster));
             databaseName.MustNotBeDefault(nameof(databaseName));
@@ -163,13 +165,12 @@ EXEC(@kill);
 #endif
             command.CommandType = CommandType.Text;
             command.CommandText = $@"
-IF db_id('{databaseName}') IS NOT NULL
+IF DB_ID('{databaseName}') IS NOT NULL
 DROP DATABASE {databaseName};
 
 CREATE DATABASE {databaseName};
 ";
-            var result = await command.ExecuteNonQueryAsync(cancellationToken);
-            return result > 0;
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
         /// <summary>
@@ -184,7 +185,7 @@ CREATE DATABASE {databaseName};
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
         /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
-        public static async Task<bool> TryDropDatabaseAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
+        public static async Task TryDropDatabaseAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
         {
             connectionToMaster.MustNotBeNull(nameof(connectionToMaster));
             databaseName.MustNotBeDefault(nameof(databaseName));
@@ -196,11 +197,10 @@ CREATE DATABASE {databaseName};
 #endif
             command.CommandType = CommandType.Text;
             command.CommandText = $@"
-IF db_id('{databaseName}') IS NOT NULL
+IF DB_ID('{databaseName}') IS NOT NULL
 DROP DATABASE {databaseName};
 ";
-            var result = await command.ExecuteNonQueryAsync(cancellationToken);
-            return result > 0;
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
         /// <summary>
@@ -215,7 +215,7 @@ DROP DATABASE {databaseName};
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
         /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
-        public static async Task<bool> TryCreateDatabaseAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
+        public static async Task TryCreateDatabaseAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
         {
             connectionToMaster.MustNotBeNull(nameof(connectionToMaster));
             databaseName.MustNotBeDefault(nameof(databaseName));
@@ -227,12 +227,11 @@ DROP DATABASE {databaseName};
 #endif
             command.CommandType = CommandType.Text;
             command.CommandText = $@"
-IF db_id({databaseName}) IS NULL
+IF DB_ID('{databaseName}') IS NULL
 CREATE DATABASE {databaseName};
 ";
 
-            var result = await command.ExecuteNonQueryAsync(cancellationToken);
-            return result > 0;
+            await command.ExecuteNonQueryAsync(cancellationToken);
         }
     }
 }
