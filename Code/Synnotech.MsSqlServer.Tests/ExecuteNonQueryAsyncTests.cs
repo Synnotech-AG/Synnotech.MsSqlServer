@@ -9,7 +9,7 @@ namespace Synnotech.MsSqlServer.Tests
         [SkippableFact]
         public static async Task ExecuteNonQuery()
         {
-            var connectionString = TestSettings.TryGetConnectionString();
+            var connectionString = TestSettings.GetConnectionStringOrSkip();
             await Database.DropAndCreateDatabaseAsync(connectionString);
             await Database.ExecuteNonQueryAsync(connectionString, typeof(ExecuteNonQueryAsyncTests).GetEmbeddedResource("SimpleDatabase.sql"));
         }

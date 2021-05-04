@@ -7,7 +7,7 @@ namespace Synnotech.MsSqlServer.Tests
 {
     public static class TestSettings
     {
-        public static string TryGetConnectionString()
+        public static string GetConnectionStringOrSkip()
         {
             Skip.IfNot(SynnotechTestSettings.Configuration.GetValue<bool>("database:areTestsEnabled"));
             return SynnotechTestSettings.Configuration["database:connectionString"] ??

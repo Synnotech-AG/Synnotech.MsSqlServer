@@ -10,7 +10,7 @@ namespace Synnotech.MsSqlServer.Tests
         [SkippableFact]
         public static async Task CreateDatabaseThatDoesNotExist()
         {
-            var connectionString = TestSettings.TryGetConnectionString();
+            var connectionString = TestSettings.GetConnectionStringOrSkip();
             await Database.TryDropDatabaseAsync(connectionString);
 
             await Database.TryCreateDatabaseAsync(connectionString);
@@ -19,7 +19,7 @@ namespace Synnotech.MsSqlServer.Tests
         [SkippableFact]
         public static async Task DoNotCreateWhenDatabaseAlreadyExists()
         {
-            var connectionString = TestSettings.TryGetConnectionString();
+            var connectionString = TestSettings.GetConnectionStringOrSkip();
             await Database.TryCreateDatabaseAsync(connectionString);
 
             await Database.TryCreateDatabaseAsync(connectionString);
