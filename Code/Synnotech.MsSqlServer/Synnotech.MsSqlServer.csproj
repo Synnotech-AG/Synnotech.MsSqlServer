@@ -5,7 +5,7 @@
         <Authors>Synnotech AG</Authors>
         <Company>Synnotech AG</Company>
         <Copyright>Copyright © Synnotech AG 2021</Copyright>
-        <Version>1.0.0</Version>
+        <Version>1.1.0</Version>
         <Description>Provides common functionality for database access to MS SQL Server.</Description>
         <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
         <LangVersion>9.0</LangVersion>
@@ -22,12 +22,12 @@
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReleaseNotes>
-Synntech.MsSqlServer 1.0.0
+Synntech.MsSqlServer 1.1.0
 --------------------------------
 
-- initial release
-- use the `Database` class to create or drop databases
-- use the `SqlEscaping` and `DatabaseName` types to escape database names
+- use `Database.OpenConnectionAsync` to create and open a new SQL connection
+- use `Database.ExecuteNonQueryAsync` to easily execute a SQL command, with or without a transaction
+- all async methods now support Cancellation Tokens
 - you can read the full docs at https://github.com/Synnotech-AG/Synnotech.MsSqlServer
         </PackageReleaseNotes>
     </PropertyGroup>
