@@ -218,7 +218,10 @@ CREATE DATABASE {databaseName};
         /// <param name="connectionString">The connection string that identifies the target database.</param>
         /// <param name="sql">The SQL statements that should be executed against the database.</param>
         /// <param name="configureCommand">The delegate that allows you to further configure the SQL command (optional). You will probably want to use this to add parameters to the command.</param>
-        /// <param name="transactionLevel">The value indicating whether the command is executed within a transaction.</param>
+        /// <param name="transactionLevel">
+        /// The value indicating whether the command is executed within a transaction (optional).
+        /// If the value is not null, a transaction with the specified level will be created.
+        /// </param>
         /// <param name="cancellationToken">The cancellation instruction (optional).</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionString" /> or <paramref name="sql" /> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when either <paramref name="connectionString" /> or <paramref name="sql" /> is an empty string or contains only white space.</exception>
@@ -248,8 +251,11 @@ CREATE DATABASE {databaseName};
         /// </summary>
         /// <param name="connection">The SQL connection to the target database.</param>
         /// <param name="sql">The SQL statement that should be executed.</param>
-        /// <param name="configureCommand"></param>
-        /// <param name="transactionLevel">The value indicating whether the command is executed within a transaction.</param>
+        /// <param name="configureCommand">The delegate that allows you to further configure the SQL command (optional). You will probably want to use this to add parameters to the command.</param>
+        /// <param name="transactionLevel">
+        /// The value indicating whether the command is executed within a transaction (optional).
+        /// If the value is not null, a transaction with the specified level will be created.
+        /// </param>
         /// <param name="cancellationToken">The cancellation instruction (optional).</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection" /> or <paramref name="sql" /> is null.</exception>
         /// <exception cref="ArgumentException">Thrown when <paramref name="sql" /> is an empty string or contains only white space.</exception>
