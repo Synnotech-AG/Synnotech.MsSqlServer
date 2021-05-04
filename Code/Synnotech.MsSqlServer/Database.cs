@@ -114,8 +114,8 @@ namespace Synnotech.MsSqlServer
         /// </param>
         /// <param name="databaseName">The name of the target database.</param>
         /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
         /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
         public static async Task KillAllDatabaseConnectionsAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
         {
@@ -150,8 +150,8 @@ EXEC(@kill);
         /// </param>
         /// <param name="databaseName">The name of the target database.</param>
         /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
         /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
         public static async Task DropAndCreateDatabaseAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
         {
@@ -182,8 +182,8 @@ CREATE DATABASE {databaseName};
         /// </param>
         /// <param name="databaseName">The name of the target database.</param>
         /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
         /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
         public static async Task TryDropDatabaseAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
         {
@@ -212,8 +212,8 @@ DROP DATABASE {databaseName};
         /// </param>
         /// <param name="databaseName">The name of the target database.</param>
         /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
         /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
         public static async Task TryCreateDatabaseAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
         {
@@ -232,6 +232,81 @@ CREATE DATABASE {databaseName};
 ";
 
             await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        /// <summary>
+        /// Executes the specified SQL against the database that is targeted by the connection string.
+        /// The underlying SQL command will be called with ExecuteNonQueryAsync.
+        /// You can use the optional delegate to configure the command (to e.g. provide parameters).
+        /// </summary>
+        /// <param name="connectionString">The connection string that identifies the target database.</param>
+        /// <param name="sql">The SQL statements that should be executed against the database.</param>
+        /// <param name="configureCommand">The delegate that allows you to further configure the SQL command (optional). You will probably want to use this to add parameters to the command.</param>
+        /// <param name="transactionLevel">The value indicating whether the command is executed within a transaction.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionString"/> or <paramref name="sql"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when either <paramref name="connectionString"/> or <paramref name="sql"/> is an empty string or contains only white space.</exception>
+        /// <exception cref="SqlException">Thrown when any I/O errors with MS SQL Server occur.</exception>
+        public static async Task<int> ExecuteNonQueryAsync(string connectionString, string sql, Action<SqlCommand>? configureCommand = null, IsolationLevel? transactionLevel = null)
+        {
+            connectionString.MustNotBeNullOrWhiteSpace(nameof(connectionString));
+            sql.MustNotBeNullOrWhiteSpace(nameof(sql));
+
+#if NETSTANDARD2_0
+            using var connection =
+#else
+            await using var connection =
+#endif
+                new SqlConnection(connectionString);
+
+            await connection.OpenAsync();
+            return await connection.ExecuteNonQueryAsync(sql, configureCommand, transactionLevel);
+        }
+
+        /// <summary>
+        /// Executes the specified SQL against the database that is targeted by the connection string.
+        /// You can use the optional delegate to configure the command (to e.g. provide parameters).
+        /// </summary>
+        /// <param name="connection">The SQL connection to the target database.</param>
+        /// <param name="sql">The SQL statement that should be executed.</param>
+        /// <param name="configureCommand"></param>
+        /// <param name="transactionLevel">The value indicating whether the command is executed within a transaction.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection"/> or <paramref name="sql"/> is null.</exception>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="sql"/> is an empty string or contains only white space.</exception>
+        /// <exception cref="SqlException">Thrown when any I/O errors with MS SQL Server occur.</exception>
+        public static Task<int> ExecuteNonQueryAsync(this SqlConnection connection, string sql, Action<SqlCommand>? configureCommand = null, IsolationLevel? transactionLevel = null)
+        {
+            connection.MustNotBeNull(nameof(connection));
+            sql.MustNotBeNullOrWhiteSpace(nameof(sql));
+
+            var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.CommandType = CommandType.Text;
+            configureCommand?.Invoke(command);
+
+            return transactionLevel == null ? command.ExecuteNonQueryAndDisposeAsync() : connection.ExecuteNonQueryWithTransactionAsync(command, transactionLevel.Value);
+        }
+
+        private static async Task<int> ExecuteNonQueryAndDisposeAsync(this SqlCommand command)
+        {
+#if NETSTANDARD2_0
+            using (command)
+#else
+            await using (command)
+#endif
+            {
+                return await command.ExecuteNonQueryAsync();
+            }
+        }
+
+        private static async Task<int> ExecuteNonQueryWithTransactionAsync(this SqlConnection connection, SqlCommand command, IsolationLevel transactionLevel)
+        {
+#if NETSTANDARD2_0
+            using var transaction = connection.BeginTransaction(transactionLevel);
+#else
+            await using var transaction = (SqlTransaction) await connection.BeginTransactionAsync(transactionLevel);
+#endif
+            command.Transaction = transaction;
+            return await command.ExecuteNonQueryAndDisposeAsync();
         }
     }
 }

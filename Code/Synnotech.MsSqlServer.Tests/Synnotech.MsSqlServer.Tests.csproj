@@ -7,6 +7,14 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <None Remove="SimpleDatabase.sql" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <EmbeddedResource Include="SimpleDatabase.sql" />
+    </ItemGroup>
+
+    <ItemGroup>
         <ProjectReference Include="..\Synnotech.MsSqlServer\Synnotech.MsSqlServer.csproj" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="16.9.4" />
         <PackageReference Include="xunit" Version="2.4.1" />
@@ -19,6 +27,7 @@
         <PackageReference Include="Xunit.SkippableFact" Version="1.4.13" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="5.0.0" />
         <PackageReference Include="Light.GuardClauses" Version="9.0.0" />
+        <PackageReference Include="Light.EmbeddedResources" Version="1.1.0" />
     </ItemGroup>
 
     <ItemGroup>
