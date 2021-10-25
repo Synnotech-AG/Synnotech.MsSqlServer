@@ -11,6 +11,10 @@ namespace Synnotech.MsSqlServer.Tests
 {
     public static class AsyncReadOnlySessionTests
     {
+        [Fact]
+        public static void MustImplementIAsyncReadOnlySession() =>
+            typeof(AsyncReadOnlySession).Should().Implement<IAsyncReadOnlySession>();
+
         [SkippableFact]
         public static async Task LoadPersons()
         {
@@ -21,7 +25,7 @@ namespace Synnotech.MsSqlServer.Tests
 
 
             await using var container = new ServiceCollection().AddSqlConnection(connectionString)
-                                                               .AddSessionFactoryFor<IGetPersonsSession, GetPersonsSession>()
+                                                               .AddSessionFactoryFor<IGetPersonsSession, SqlGetPersonsSession>()
                                                                .BuildServiceProvider();
 
             var sessionFactory = container.GetRequiredService<ISessionFactory<IGetPersonsSession>>();
@@ -42,9 +46,10 @@ namespace Synnotech.MsSqlServer.Tests
             Task<List<Person>> GetPersonsAsync();
         }
 
-        private sealed class GetPersonsSession : AsyncReadOnlySession, IGetPersonsSession
+        // ReSharper disable once ClassNeverInstantiated.Local -- the session is instantiated by the DI container
+        private sealed class SqlGetPersonsSession : AsyncReadOnlySession, IGetPersonsSession
         {
-            public GetPersonsSession(SqlConnection sqlConnection) : base(sqlConnection) { }
+            public SqlGetPersonsSession(SqlConnection sqlConnection) : base(sqlConnection) { }
 
             public async Task<List<Person>> GetPersonsAsync()
             {
