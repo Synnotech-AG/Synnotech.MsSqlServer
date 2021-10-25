@@ -1,0 +1,3 @@
+SELECT *
+FROM Persons
+ORDER BY Id;
