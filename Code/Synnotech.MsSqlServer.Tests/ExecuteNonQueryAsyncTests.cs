@@ -1,5 +1,5 @@
 ﻿using System.Threading.Tasks;
-using Light.EmbeddedResources;
+using Synnotech.MsSqlServer.Tests.SqlScripts;
 using Xunit;
 
 namespace Synnotech.MsSqlServer.Tests
@@ -11,7 +11,7 @@ namespace Synnotech.MsSqlServer.Tests
         {
             var connectionString = TestSettings.GetConnectionStringOrSkip();
             await Database.DropAndCreateDatabaseAsync(connectionString);
-            await Database.ExecuteNonQueryAsync(connectionString, typeof(ExecuteNonQueryAsyncTests).GetEmbeddedResource("SimpleDatabase.sql"));
+            await Database.ExecuteNonQueryAsync(connectionString, Scripts.SimpleDatabaseScript);
         }
     }
 }

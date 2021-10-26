@@ -4,7 +4,7 @@ namespace Synnotech.MsSqlServer
 {
     /// <summary>
     /// Represents a string value that is a valid SQL Server database identifier. This is
-    /// done by calling <see cref="SqlEscaping.CheckAndNormalizeDatabaseName"/>. The check is done
+    /// done by calling <see cref="SqlEscaping.CheckAndNormalizeDatabaseName" />. The check is done
     /// according to the rules of https://docs.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers?view=sql-server-ver15#rules-for-regular-identifiers.
     /// </summary>
     public readonly struct DatabaseName : IEquatable<DatabaseName>
@@ -15,9 +15,9 @@ namespace Synnotech.MsSqlServer
         /// Initializes a new instance of <see cref="DatabaseName" />.
         /// </summary>
         /// <param name="databaseName">The name of the database.</param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="databaseName"/> is null.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="databaseName" /> is null.</exception>
         /// <exception cref="ArgumentException">
-        /// Thrown when <paramref name="databaseName"/> is an empty string or contains only white space, when it has more than 123 characters
+        /// Thrown when <paramref name="databaseName" /> is an empty string or contains only white space, when it has more than 123 characters
         /// after being trimmed, or when it contains invalid characters.
         /// </exception>
         public DatabaseName(string databaseName)
@@ -49,12 +49,12 @@ namespace Synnotech.MsSqlServer
         public override string ToString() => _databaseName;
 
         /// <summary>
-        /// Compares two <see cref="DatabaseName"/> instances for equality.
+        /// Compares two <see cref="DatabaseName" /> instances for equality.
         /// </summary>
         public static bool operator ==(DatabaseName x, DatabaseName y) => x.Equals(y);
 
         /// <summary>
-        /// Compares two <see cref="DatabaseName"/> instances for inequality.
+        /// Compares two <see cref="DatabaseName" /> instances for inequality.
         /// </summary>
         public static bool operator !=(DatabaseName x, DatabaseName y) => !x.Equals(y);
 

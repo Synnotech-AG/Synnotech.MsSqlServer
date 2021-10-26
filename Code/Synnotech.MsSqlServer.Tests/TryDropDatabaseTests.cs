@@ -1,5 +1,4 @@
 ﻿using System.Threading.Tasks;
-using FluentAssertions;
 using Synnotech.Xunit;
 using Xunit;
 

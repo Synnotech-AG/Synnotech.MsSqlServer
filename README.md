@@ -4,7 +4,7 @@
 [![Synnotech Logo](synnotech-large-logo.png)](https://www.synnotech.de/)
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://github.com/Synnotech-AG/Synnotech.MsSqlServer/blob/main/LICENSE)
-[![NuGet](https://img.shields.io/badge/NuGet-1.1.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
+[![NuGet](https://img.shields.io/badge/NuGet-2.0.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
 
 # How to Install
 
@@ -12,11 +12,120 @@ Synnotech.MsSqlServer is compiled against [.NET Standard 2.0 and 2.1](https://do
 
 Synnotech.MsSqlServer is available as a [NuGet package](https://www.nuget.org/packages/Synnotech.MsSqlServer/) and can be installed via:
 
-- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="1.1.0" />`
+- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="2.0.0" />`
 - **dotnet CLI**: `dotnet add package Synnotech.MsSqlServer`
 - **Visual Studio Package Manager Console**: `Install-Package Synnotech.MsSqlServer`
 
 # What does Synnotech.MsSqlServer offer you?
+
+## Async Sessions with ADO.NET
+
+As of version 2.0.0, Synnotech.MsSqlServer implements the `IAsyncSession` and `IAsyncReadOnlySession` from [Synnotech.DatabaseAbstractions](https://github.com/synnotech-AG/synnotech.DatabaseAbstractions). These allow you to make direct ADO.NET requests via a `SqlConnection` and `SqlCommand` through the forementioned abstractions. All async methods have full support for cancellation tokens.
+
+Consider the following abstraction for database access:
+
+```csharp
+public interface IGetContactSession : IAsyncReadOnlySession
+{
+    Task<Contact?> GetContactAsync(int id);
+}
+```
+
+To implement this interface easily, you can derive from `AsyncReadOnlySession`:
+
+```csharp
+public sealed class SqlGetContactSession : AsyncReadOnlySession, IGetContactSession
+{
+    public SqlGetContactSession(SqlConnection sqlConnection) : base(sqlConnection) { }
+
+    public async Task<Contact?> GetContactAsync(int id)
+    {
+        // The following line will create a SqlCommand and automatically
+        // attach the current transaction to it (if a transaction is present).
+        await using var command = CreateCommand(); 
+
+        // We encourage you to use Light.EmbeddedResources and save your SQL
+        // queries as embedded SQL files to your assembly.
+        command.CommandText = SqlScripts.GetScript("GetContact.sql");
+        command.Parameters.Add("@Id", SqlDbType.Int).Value = id;
+
+        await using var reader = await command.ExecuteReaderAsync();
+        return await DeserializeContactAsync(reader);
+    }
+
+    private async Task<Contact?> DeserializeContactAsync(SqlDataReader reader)
+    {
+        if (!reader.HasRows)
+            return null;
+
+        var idOrdinal = reader.GetOrdinal(nameof(Contact.Id));
+        var nameOrdinal = reader.GetOrdinal(nameof(Contact.Name));
+        var emailOrdinal = reader.GetOrdinal(nameof(Contact.Email));
+
+        if (!await reader.ReadAsync())
+            throw new SerializationException("The reader could not advance to the single row");
+
+        var id = reader.GetInt32(idOrdinal);
+        var name = reader.GetString(nameOrdinal);
+        var email = reader.GetString(emailOrdinal);
+        return new Contact { Id = id, Name = name, Email = email };
+    }
+}
+```
+
+Your SQL script to get a person can be stored in a dedicated SQL file that can be embedded in your assembly. You can use [Light.EmbeddedResources](https://github.com/feO2x/Light.EmbeddedResources) to easily access them:
+
+```csharp
+public static class Sqlcripts
+{
+    public static string GetScript(string name) => typeof(Sqlcripts).GetEmbeddedResource(name);
+}
+```
+
+```sql
+SELECT *
+FROM Contacts
+WHERE [Id] = @Id;
+```
+
+You can then add your sessions to your DI container by calling the `AddSessionFactoryFor` extension method:
+
+```csharp
+services.AddSessionFactoryFor<IGetContactSession, SqlGetContactSession>();
+```
+
+Be sure that a `SqlConnection` is already registered with the DI Container. You can use the `AddSqlConnection` extension method for that.
+
+To call your session, e.g. in an ASP.NET Core MVC controller, you simply instantiate the session via the factory:
+
+```csharp
+[ApiController]
+[Route("api/contacts")]
+public sealed class GetContactController : ControllerBase
+{
+    public GetContactController(ISessionFactory<IGetContactSession> sessionFactory) =>
+        SessionFactory = sessionFactory;
+
+    private ISessionFactory<IGetContactSession> SessionFactory { get; }
+
+    [HttpGet("{id}")]
+    public async Task<ActionResult<Contact>> GetContact(int id)
+    {
+        // The following call will open the session asynchronously and start
+        // a transaction (if necessary), all in one go.
+        await using var session = await SessionFactory.OpenSessionAsync();
+
+        var contact = await session.GetContactAsync(id);
+        if (contact == null)
+            return NotFound();
+        return contact();
+    }
+}
+```
+
+If you want to manipulate data, then simply derive from `AsyncSession` instead. This gives you an additional `SaveChangesAsync` method that allows you to commit the internal transaction.
+
+Please be aware: Synnotech.DatabaseAbstractions does not support nested transactions. If you need them, you must create your own abstraction for it. However, we generally recommend to not use nested transactions, but use sequential transactions (e.g. when performaing batch operations).
 
 ## Easily Open SQL Connections
 
@@ -154,3 +263,9 @@ Finally, both of the overloads support `CancellationToken`.
 ## Database Name Escaping
 
 For most things, the `SqlCommand` provides parameters that will be properly escaped when executing queries or DML statements. However, DDL statements usually do not support parameters. You can manually escape database identifiers by using the `SqlEscaping.CheckAndNormalizeDatabaseName` function. Alternatively, you can use the `DatabaseName` struct to encapsulate an escaped database identifier. The identifiers are escaped according to the [official rules of SQL Server](https://docs.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers?view=sql-server-ver15#rules-for-regular-identifiers).
+
+## Migration Guide
+
+### From 1.1.0 to 2.0.0
+
+Version 2.0.0 uses [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/) instead of [Microsoft.Data.SqlClient](https://www.nuget.org/packages/Microsoft.Data.SqlClient/). This allows you to use spatial types and `SqlHierarchyId` in .NET Core and .NET 5/6 projects via [dotmortem.Microsoft.SqlServer.Types](https://github.com/dotMorten/Microsoft.SqlServer.Types). You simply need to recompile to make this work.
