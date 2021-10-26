@@ -1,7 +1,7 @@
 ﻿using System.Data;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Synnotech.DatabaseAbstractions;
 using Synnotech.MsSqlServer.Tests.SqlScripts;
@@ -14,6 +14,10 @@ namespace Synnotech.MsSqlServer.Tests
         [Fact]
         public static void MustImplementIAsyncSession() =>
             typeof(AsyncSession).Should().Implement<IAsyncSession>();
+
+        [Fact]
+        public static void MustBeAbstract() =>
+            typeof(AsyncSession).Should().BeAbstract();
 
         [SkippableFact]
         public static async Task UpdatePerson()
@@ -68,7 +72,7 @@ namespace Synnotech.MsSqlServer.Tests
             Task<Person?> GetPersonAsync(int id);
         }
 
-        
+
         // ReSharper disable once ClassNeverInstantiated.Local -- the session is instantiated by the DI container
         private sealed class SqlGetPersonSession : AsyncReadOnlySession, IGetPersonSession
         {

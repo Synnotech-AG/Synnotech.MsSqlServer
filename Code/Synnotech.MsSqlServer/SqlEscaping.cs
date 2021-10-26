@@ -15,9 +15,9 @@ namespace Synnotech.MsSqlServer
         /// This method is implemented according to https://docs.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers?view=sql-server-ver15#rules-for-regular-identifiers.
         /// </summary>
         /// <param name="databaseName"></param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="databaseName"/> is null.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="databaseName" /> is null.</exception>
         /// <exception cref="ArgumentException">
-        /// Thrown when <paramref name="databaseName"/> is an empty string or contains only white space, when it has more than 123 characters
+        /// Thrown when <paramref name="databaseName" /> is an empty string or contains only white space, when it has more than 123 characters
         /// after being trimmed, or when it contains invalid characters.
         /// </exception>
         public static string CheckAndNormalizeDatabaseName(string databaseName)
@@ -95,8 +95,8 @@ namespace Synnotech.MsSqlServer
             /// calling this method.
             /// </summary>
             /// <param name="identifier">The identifier that needs to be escaped with brackets.</param>
-            /// <exception cref="ArgumentNullException">Thrown when <paramref name="identifier"/> is null.</exception>
-            /// <exception cref="ArgumentException">Thrown when <paramref name="identifier"/> is an empty string</exception>
+            /// <exception cref="ArgumentNullException">Thrown when <paramref name="identifier" /> is null.</exception>
+            /// <exception cref="ArgumentException">Thrown when <paramref name="identifier" /> is an empty string</exception>
             public static string PadWithBrackets(string identifier)
             {
                 identifier.MustNotBeNullOrEmpty(nameof(identifier));

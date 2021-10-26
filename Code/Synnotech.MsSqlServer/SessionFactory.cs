@@ -1,8 +1,8 @@
 ﻿using System;
+using System.Data.SqlClient;
 using System.Threading;
 using System.Threading.Tasks;
 using Light.GuardClauses;
-using Microsoft.Data.SqlClient;
 using Synnotech.DatabaseAbstractions;
 
 namespace Synnotech.MsSqlServer

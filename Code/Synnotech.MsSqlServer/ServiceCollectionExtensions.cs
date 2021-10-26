@@ -1,6 +1,6 @@
 ﻿using System;
+using System.Data.SqlClient;
 using Light.GuardClauses;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Synnotech.DatabaseAbstractions;
 

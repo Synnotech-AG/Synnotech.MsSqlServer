@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Synnotech.DatabaseAbstractions;
 using Synnotech.MsSqlServer.Tests.SqlScripts;
@@ -14,6 +14,10 @@ namespace Synnotech.MsSqlServer.Tests
         [Fact]
         public static void MustImplementIAsyncReadOnlySession() =>
             typeof(AsyncReadOnlySession).Should().Implement<IAsyncReadOnlySession>();
+
+        [Fact]
+        public static void MustBeAbstract() =>
+            typeof(AsyncReadOnlySession).Should().BeAbstract();
 
         [SkippableFact]
         public static async Task LoadPersons()

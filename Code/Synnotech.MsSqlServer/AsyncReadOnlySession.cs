@@ -1,9 +1,9 @@
 ﻿using System;
 using System.Data;
+using System.Data.SqlClient;
 using System.Threading;
 using System.Threading.Tasks;
 using Light.GuardClauses;
-using Microsoft.Data.SqlClient;
 using Synnotech.DatabaseAbstractions;
 
 namespace Synnotech.MsSqlServer
@@ -37,7 +37,7 @@ namespace Synnotech.MsSqlServer
         /// The isolation level for the transaction (optional). The default value is <see cref="IsolationLevel.Unspecified" />.
         /// When this value is set to <see cref="IsolationLevel.Unspecified" />, no transaction will be started.
         /// </param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="sqlConnection"/> is null.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="sqlConnection" /> is null.</exception>
         protected AsyncReadOnlySession(SqlConnection sqlConnection, IsolationLevel transactionLevel = IsolationLevel.Unspecified)
         {
             SqlConnection = sqlConnection.MustNotBeNull(nameof(sqlConnection));

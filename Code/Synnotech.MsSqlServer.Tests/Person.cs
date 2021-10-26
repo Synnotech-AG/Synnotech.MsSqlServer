@@ -1,7 +1,7 @@
 ﻿using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
-using Microsoft.Data.SqlClient;
 
 namespace Synnotech.MsSqlServer.Tests
 {
