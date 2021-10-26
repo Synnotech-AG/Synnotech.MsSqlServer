@@ -56,7 +56,7 @@ namespace Synnotech.MsSqlServer.Tests
                 await using var command = SqlConnection.CreateCommand();
                 command.CommandText = Scripts.GetPersonsScript;
                 await using var reader = await command.ExecuteReaderAsync();
-                return await reader.DeserializePersons();
+                return await reader.DeserializePersonsAsync();
             }
         }
     }

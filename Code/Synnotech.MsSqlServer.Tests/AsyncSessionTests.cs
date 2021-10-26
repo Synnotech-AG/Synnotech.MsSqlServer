@@ -25,13 +25,19 @@ namespace Synnotech.MsSqlServer.Tests
 
             await using var container = new ServiceCollection().AddSqlConnection(connectionString)
                                                                .AddSessionFactoryFor<IUpdatePersonSession, SqlUpdatePersonSession>()
+                                                               .AddSessionFactoryFor<IGetPersonSession, SqlGetPersonSession>()
                                                                .BuildServiceProvider();
 
-            var sessionFactory = container.GetRequiredService<ISessionFactory<IUpdatePersonSession>>();
-            await using var session = await sessionFactory.OpenSessionAsync();
-            var person = new Person { Id = 1, Name = "Jane Doe", Age = 24 };
-            await session.UpdatePersonAsync(person);
-            await session.SaveChangesAsync();
+            var updateSessionFactory = container.GetRequiredService<ISessionFactory<IUpdatePersonSession>>();
+            await using var updateSession = await updateSessionFactory.OpenSessionAsync();
+            var updatedPerson = new Person { Id = 1, Name = "Jane Doe", Age = 24 };
+            await updateSession.UpdatePersonAsync(updatedPerson);
+            await updateSession.SaveChangesAsync();
+
+            var getSessionFactory = container.GetRequiredService<ISessionFactory<IGetPersonSession>>();
+            await using var getSession = await getSessionFactory.OpenSessionAsync();
+            var loadedPerson = await getSession.GetPersonAsync(1);
+            loadedPerson.Should().BeEquivalentTo(updatedPerson);
         }
 
         private interface IUpdatePersonSession : IAsyncSession
@@ -54,6 +60,27 @@ namespace Synnotech.MsSqlServer.Tests
                 command.Parameters.Add("@Name", SqlDbType.NVarChar).Value = person.Name;
                 command.Parameters.Add("@Age", SqlDbType.Int).Value = person.Age;
                 await command.ExecuteNonQueryAsync();
+            }
+        }
+
+        private interface IGetPersonSession : IAsyncReadOnlySession
+        {
+            Task<Person?> GetPersonAsync(int id);
+        }
+
+        
+        // ReSharper disable once ClassNeverInstantiated.Local -- the session is instantiated by the DI container
+        private sealed class SqlGetPersonSession : AsyncReadOnlySession, IGetPersonSession
+        {
+            public SqlGetPersonSession(SqlConnection sqlConnection) : base(sqlConnection) { }
+
+            public async Task<Person?> GetPersonAsync(int id)
+            {
+                await using var command = CreateCommand();
+                command.CommandText = Scripts.GetPersonScript;
+                command.Parameters.Add("@Id", SqlDbType.Int).Value = id;
+                await using var reader = await command.ExecuteReaderAsync();
+                return await reader.DeserializePersonAsync();
             }
         }
     }
