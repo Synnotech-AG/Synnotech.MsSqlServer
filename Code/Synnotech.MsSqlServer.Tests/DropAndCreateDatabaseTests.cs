@@ -2,27 +2,26 @@
 using Synnotech.Xunit;
 using Xunit;
 
-namespace Synnotech.MsSqlServer.Tests
+namespace Synnotech.MsSqlServer.Tests;
+
+[TestCaseOrderer(TestOrderer.TypeName, TestOrderer.AssemblyName)]
+public static class DropAndCreateDatabaseTests
 {
-    [TestCaseOrderer(TestOrderer.TypeName, TestOrderer.AssemblyName)]
-    public static class DropAndCreateDatabaseTests
+    [SkippableFact]
+    public static async Task DropAndRecreateExistingDatabase()
     {
-        [SkippableFact]
-        public static async Task DropAndRecreateExistingDatabase()
-        {
-            var connectionString = TestSettings.GetConnectionStringOrSkip();
-            await Database.TryCreateDatabaseAsync(connectionString);
+        var connectionString = TestSettings.GetConnectionStringOrSkip();
+        await Database.TryCreateDatabaseAsync(connectionString);
 
-            await Database.DropAndCreateDatabaseAsync(connectionString);
-        }
+        await Database.DropAndCreateDatabaseAsync(connectionString);
+    }
 
-        [SkippableFact]
-        public static async Task CreateNonExistentDatabase()
-        {
-            var connectionString = TestSettings.GetConnectionStringOrSkip();
-            await Database.TryDropDatabaseAsync(connectionString);
+    [SkippableFact]
+    public static async Task CreateNonExistentDatabase()
+    {
+        var connectionString = TestSettings.GetConnectionStringOrSkip();
+        await Database.TryDropDatabaseAsync(connectionString);
 
-            await Database.DropAndCreateDatabaseAsync(connectionString);
-        }
+        await Database.DropAndCreateDatabaseAsync(connectionString);
     }
 }
