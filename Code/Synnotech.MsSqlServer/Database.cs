@@ -2,9 +2,11 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Light.GuardClauses;
+using Light.GuardClauses.Exceptions;
 
 namespace Synnotech.MsSqlServer;
 
@@ -144,10 +146,10 @@ public static class Database
         await connectionToMaster.DropAndCreateDatabaseAsync(databaseName, retryCount, intervalBetweenRetriesInMilliseconds, processException, cancellationToken);
     }
 
-    private static (string connectionStringToMaster, DatabaseName databaseName) PrepareMasterConnectionAndDatabaseName(this string connectionString)
+    private static (string connectionStringToMaster, string databaseName) PrepareMasterConnectionAndDatabaseName(this string connectionString)
     {
         var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
-        DatabaseName databaseName = connectionStringBuilder.InitialCatalog;
+        string databaseName = connectionStringBuilder.InitialCatalog;
         connectionStringBuilder.InitialCatalog = "master";
         return (connectionStringBuilder.ConnectionString, databaseName);
     }
@@ -227,12 +229,12 @@ EXEC(@kill);
         // These system process sessions cannot be killed. I introduced a retry strategy simply in the hope
         // of the system process disconnecting quickly enough so that a subsequent call to DROP Database and
         // CREATE DATABASE will succeed.
+        var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
 IF DB_ID('{databaseName}') IS NOT NULL
-DROP DATABASE {databaseName};
+DROP DATABASE {databaseIdentifier};
 
-CREATE DATABASE {databaseName};
-";
+CREATE DATABASE {databaseIdentifier};";
 
         var numberOfTries = 1;
         while (true)
@@ -287,9 +289,10 @@ CREATE DATABASE {databaseName};
         retryCount.MustBeGreaterThanOrEqualTo(0);
         intervalBetweenRetriesInMilliseconds.MustBeGreaterThan(0);
 
+        var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
 IF DB_ID('{databaseName}') IS NOT NULL
-DROP DATABASE {databaseName};
+DROP DATABASE {databaseIdentifier};
 ";
 
         var numberOfTries = 1;
@@ -345,9 +348,10 @@ DROP DATABASE {databaseName};
         retryCount.MustBeGreaterThanOrEqualTo(0);
         intervalBetweenRetriesInMilliseconds.MustBeGreaterThan(0);
 
+        var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
 IF DB_ID('{databaseName}') IS NULL
-CREATE DATABASE {databaseName};
+CREATE DATABASE {databaseIdentifier};
 ";
 
         var numberOfTries = 1;
@@ -476,5 +480,132 @@ CREATE DATABASE {databaseName};
         var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(cancellationToken);
         return connection;
+    }
+
+    public static async Task<DatabasePhysicalFilesInfo> DetachDatabaseAsync(this string connectionString,
+                                                                            int retryCount = 3,
+                                                                            int intervalBetweenRetriesInMilliseconds = 750,
+                                                                            Action<SqlException>? processException = null,
+                                                                            CancellationToken cancellationToken = default)
+    {
+        var (masterConnectionString, databaseName) = PrepareMasterConnectionAndDatabaseName(connectionString);
+
+        var info = await GetPhysicalFilesInfoAsync(connectionString, databaseName, cancellationToken);
+
+#if NETSTANDARD2_0
+        using var masterConnection =
+#else
+        await using var masterConnection =
+#endif
+            await OpenConnectionAsync(masterConnectionString, cancellationToken);
+
+        await masterConnection.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
+        await masterConnection.DetachDatabaseAsync(databaseName,
+                                                   retryCount,
+                                                   intervalBetweenRetriesInMilliseconds,
+                                                   processException,
+                                                   cancellationToken);
+        return info;
+    }
+
+    public static async Task DetachDatabaseAsync(this SqlConnection connectionToMaster,
+                                                 DatabaseName databaseName,
+                                                 int retryCount = 3,
+                                                 int intervalBetweenRetriesInMilliseconds = 750,
+                                                 Action<SqlException>? processException = null,
+                                                 CancellationToken cancellationToken = default)
+    {
+        connectionToMaster.MustNotBeNull();
+        databaseName.MustNotBeDefault();
+        retryCount.MustBeGreaterThanOrEqualTo(0);
+        intervalBetweenRetriesInMilliseconds.MustBeGreaterThan(0);
+
+        var sql = $@"EXEC sp_detach_db N'{databaseName}', 'true'";
+
+        var numberOfTries = 1;
+        while (true)
+        {
+            try
+            {
+                var result = await connectionToMaster.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
+                Debug.Assert(result == 0, "sp_detach_db returns 0 on success.");
+                return;
+            }
+            catch (SqlException exception)
+            {
+                processException?.Invoke(exception);
+                if (numberOfTries++ > retryCount)
+                    throw;
+
+                await Task.Delay(intervalBetweenRetriesInMilliseconds, cancellationToken);
+            }
+        }
+    }
+
+    public static Task<DatabasePhysicalFilesInfo> GetPhysicalFilesInfoAsync(this string connectionString,
+                                                                            CancellationToken cancellationToken = default)
+    {
+        var sqlConnectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
+        DatabaseName databaseName = sqlConnectionStringBuilder.InitialCatalog;
+        return connectionString.GetPhysicalFilesInfoAsync(databaseName, cancellationToken);
+    }
+
+    private static async Task<DatabasePhysicalFilesInfo> GetPhysicalFilesInfoAsync(this string connectionString,
+                                                                                   DatabaseName databaseName,
+                                                                                   CancellationToken cancellationToken = default)
+    {
+        #if NETSTANDARD2_0
+            using var connection = 
+        #else
+        await using var connection =
+#endif
+            await OpenConnectionAsync(connectionString, cancellationToken);
+
+#if NETSTANDARD2_0
+        using var command =
+#else
+        await using var command = 
+#endif
+            connection.CreateCommand();
+        command.CommandText = @"
+SELECT type_desc Type,
+       physical_name PhysicalFilePath
+FROM sys.database_files;";
+
+#if NETSTANDARD2_0
+        using var reader =
+#else
+        await using var reader =
+#endif
+            await command.ExecuteReaderAsync(CommandBehavior.SingleResult, cancellationToken);
+
+        string? mdfFilePath = null;
+        string? ldfFilePath = null;
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var type = reader.GetString(0);
+            var filePath = reader.GetString(1);
+
+            if ("ROWS".Equals(type, StringComparison.OrdinalIgnoreCase))
+            {
+                if (mdfFilePath is not null)
+                    throw new InvalidStateException($"The database with connection string \"{connectionString}\" contains several file locations for its data (type ROWS) and cannot be treated as a default database in SQL Server.");
+                mdfFilePath = filePath;
+            }
+            else if ("LOG".Equals(type, StringComparison.OrdinalIgnoreCase))
+            {
+                if (ldfFilePath is not null)
+                    throw new InvalidStateException($"The database with connection string \"{connectionString}\" contains several file locations for its logs (type LOG) and cannot be treated as a default database in SQL Server.");
+                ldfFilePath = filePath;
+            }
+        }
+
+        if (mdfFilePath is null)
+            throw new InvalidStateException($"The database with connection string \"{connectionString}\" has no file location for its data (type ROWS).");
+        if (ldfFilePath is null)
+            throw new InvalidStateException($"The database with connection string \"{connectionString}\" has no file location for its logs (type LOG).");
+
+        return new DatabasePhysicalFilesInfo(databaseName, mdfFilePath, ldfFilePath);
     }
 }

@@ -40,6 +40,7 @@ Synntech.MsSqlServer 2.0.0
         <PackageReference Include="Light.GuardClauses" Version="10.0.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="all" />
+        <PackageReference Include="IsExternalInit" Version="1.0.2" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>
