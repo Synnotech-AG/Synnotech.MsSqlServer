@@ -37,12 +37,9 @@ Synntech.MsSqlServer 2.0.0
         <PackageReference Include="System.Data.SqlClient" Version="4.8.3" />
         <PackageReference Include="System.Memory" Version="4.5.4" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
         <PackageReference Include="Synnotech.DatabaseAbstractions" Version="3.0.0" />
-        <PackageReference Include="Light.GuardClauses" Version="9.0.0" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="5.0.0" />
-        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0">
-            <PrivateAssets>all</PrivateAssets>
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
-        </PackageReference>
+        <PackageReference Include="Light.GuardClauses" Version="10.0.0" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
+        <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>
