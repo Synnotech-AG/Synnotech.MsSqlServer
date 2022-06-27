@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Light.GuardClauses;
-using Light.GuardClauses.Exceptions;
 
 namespace Synnotech.MsSqlServer;
 
@@ -555,9 +554,7 @@ CREATE DATABASE {databaseIdentifier};
     /// <summary>
     /// <para>
     /// Detaches the database specified in the connection string and returns you information
-    /// about the physical file locations of the database. This method will only work on
-    /// databases that have a single MDF and a single LDF file (which is the default for SQL Server
-    /// database). If you have a database with several data and/or log files, this method will throw.
+    /// about the physical file locations of the database.
     /// </para>
     /// <para>
     /// This method will connect to the "master" database of the target
@@ -585,7 +582,7 @@ CREATE DATABASE {databaseIdentifier};
     /// You would usually use this delegate to log the exception.
     /// </param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <returns>A struct containing information about the database name and paths to the MDF and LDF file.</returns>
+    /// <returns>A struct containing information about the database name and paths to the MDF, LDF and other files that belong to the database.</returns>
     /// <exception cref="KeyNotFoundException">Invalid key name within the connection string.</exception>
     /// <exception cref="FormatException">Invalid value within the connection string (specifically, when a Boolean or numeric value was expected but not supplied).</exception>
     /// <exception cref="ArgumentException">The supplied connectionString is not valid.</exception>
@@ -692,13 +689,11 @@ CREATE DATABASE {databaseIdentifier};
     }
 
     /// <summary>
-    /// Returns information about the physical files of a database. This method can
-    /// only be called for databases that only have one MDF and one LDF file (which is
-    /// the default for SQL Server databases).
+    /// Returns information about the physical files of a database.
     /// </summary>
     /// <param name="connectionString">The connection string that identifies the target database.</param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <returns>A struct containing information about the database name and paths to the MDF and LDF file.</returns>
+    /// <returns>A struct containing information about the database name and paths to the MDF, LDF and other files that belong to the database.</returns>
     /// <exception cref="KeyNotFoundException">Invalid key name within the connection string.</exception>
     /// <exception cref="FormatException">Invalid value within the connection string (specifically, when a Boolean or numeric value was expected but not supplied).</exception>
     /// <exception cref="ArgumentException">The supplied connectionString is not valid.</exception>
@@ -740,33 +735,16 @@ FROM sys.database_files;";
 #endif
             await command.ExecuteReaderAsync(CommandBehavior.SingleResult, cancellationToken);
 
-        string? mdfFilePath = null;
-        string? ldfFilePath = null;
-
+        var databaseFiles = new List<DatabaseFileInfo>(2);
         while (await reader.ReadAsync(cancellationToken))
         {
             var type = reader.GetString(0);
             var filePath = reader.GetString(1);
 
-            if ("ROWS".Equals(type, StringComparison.OrdinalIgnoreCase))
-            {
-                if (mdfFilePath is not null)
-                    throw new InvalidStateException($"The database with connection string \"{connectionString}\" contains several file locations for its data (type ROWS) and cannot be treated as a default database in SQL Server.");
-                mdfFilePath = filePath;
-            }
-            else if ("LOG".Equals(type, StringComparison.OrdinalIgnoreCase))
-            {
-                if (ldfFilePath is not null)
-                    throw new InvalidStateException($"The database with connection string \"{connectionString}\" contains several file locations for its logs (type LOG) and cannot be treated as a default database in SQL Server.");
-                ldfFilePath = filePath;
-            }
+            var fileInfo = new DatabaseFileInfo(type, filePath);
+            databaseFiles.Add(fileInfo);
         }
 
-        if (mdfFilePath is null)
-            throw new InvalidStateException($"The database with connection string \"{connectionString}\" has no file location for its data (type ROWS).");
-        if (ldfFilePath is null)
-            throw new InvalidStateException($"The database with connection string \"{connectionString}\" has no file location for its logs (type LOG).");
-
-        return new DatabasePhysicalFilesInfo(databaseName, mdfFilePath, ldfFilePath);
+        return new DatabasePhysicalFilesInfo(databaseName, databaseFiles);
     }
 }
