@@ -47,6 +47,9 @@ public static class SqlEscaping
         if (databaseName.Length != span.Length)
             databaseName = span.ToString();
 
+        if (SqlKeywords.IsKeyword(databaseName))
+            databaseName = Advanced.PadWithBrackets(databaseName);
+
         return databaseName;
     }
 
