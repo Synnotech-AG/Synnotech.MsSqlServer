@@ -11,17 +11,28 @@ namespace Synnotech.MsSqlServer;
 /// <summary>
 /// Provides helper methods for creating and dropping MS SQL databases.
 /// </summary>
-public static class Database
+public static partial class Database
 {
     /// <summary>
+    /// <para>
     /// Tries to create the database the specified connection string points to. If
     /// the target database already exists, nothing will be done.
     /// This method will connect to the "master" database of the target
     /// SQL server to do this - please ensure that the credentials in the connection string
     /// have enough privileges to perform this operation.
+    /// </para>
+    /// <para>
+    /// This method implements an automatic retry-strategy. It tries for three times and
+    /// waits for 750ms between each try. You can adjust the <paramref name="retryCount" />
+    /// and <paramref name="intervalBetweenRetriesInMilliseconds" /> parameters to adjust this behavior.
+    /// Furthermore, if you want to process the caught exceptions (e.g. for logging), you
+    /// can assign the <paramref name="processException" /> delegate. If you want to cancel
+    /// early, pass a corresponding <paramref name="cancellationToken" /> that times out
+    /// after a certain amount of time.
+    /// </para>
     /// </summary>
     /// <param name="connectionString">The connection string that identifies the target database.</param>
-    /// <param name="retryCount">The number of retries this method will attempt to drop and create the database (optional). The default value is 3.</param>
+    /// <param name="retryCount">The number of retries this method will attempt to create the database (optional). The default value is 3.</param>
     /// <param name="intervalBetweenRetriesInMilliseconds">
     /// The number of milliseconds the method will wait (using Task.Delay) after an exception has occurred (optional).
     /// The default value is 750ms.
@@ -35,7 +46,11 @@ public static class Database
     /// <exception cref="KeyNotFoundException">Invalid key name within the connection string.</exception>
     /// <exception cref="FormatException">Invalid value within the connection string (specifically, when a Boolean or numeric value was expected but not supplied).</exception>
     /// <exception cref="ArgumentException">The supplied connectionString is not valid.</exception>
-    /// <exception cref="SqlException">Thrown when the connection to the master database fails or when the command fails to execute.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="retryCount" /> is less than 0 or
+    /// when <paramref name="intervalBetweenRetriesInMilliseconds" /> is less than or equal to 0.
+    /// </exception>
+    /// <exception cref="SqlException">Thrown when the connection to the master database fails or when the command fails to execute and the retry count exceeds.</exception>
     public static async Task<bool> TryCreateDatabaseAsync(string connectionString,
                                                           int retryCount = 3,
                                                           int intervalBetweenRetriesInMilliseconds = 750,
@@ -59,15 +74,26 @@ public static class Database
     }
 
     /// <summary>
+    /// <para>
     /// Tries to drop the database the specified connection string points to. All existing
     /// connections to the database will be terminated. If the database does not exist, nothing
     /// will happen.
     /// This method will connect to the "master" database of the target
     /// SQL server to do this - please ensure that the credentials in the connection string
     /// have enough privileges to perform this operation.
+    /// </para>
+    /// <para>
+    /// This method implements an automatic retry-strategy. It tries for three times and
+    /// waits for 750ms between each try. You can adjust the <paramref name="retryCount" />
+    /// and <paramref name="intervalBetweenRetriesInMilliseconds" /> parameters to adjust this behavior.
+    /// Furthermore, if you want to process the caught exceptions (e.g. for logging), you
+    /// can assign the <paramref name="processException" /> delegate. If you want to cancel
+    /// early, pass a corresponding <paramref name="cancellationToken" /> that times out
+    /// after a certain amount of time.
+    /// </para>
     /// </summary>
     /// <param name="connectionString">The connection string that identifies the target database.</param>
-    /// <param name="retryCount">The number of retries this method will attempt to drop and create the database (optional). The default value is 3.</param>
+    /// <param name="retryCount">The number of retries this method will attempt to drop the database (optional). The default value is 3.</param>
     /// <param name="intervalBetweenRetriesInMilliseconds">
     /// The number of milliseconds the method will wait (using Task.Delay) after an exception has occurred (optional).
     /// The default value is 750ms.
@@ -81,7 +107,11 @@ public static class Database
     /// <exception cref="KeyNotFoundException">Invalid key name within the connection string.</exception>
     /// <exception cref="FormatException">Invalid value within the connection string (specifically, when a Boolean or numeric value was expected but not supplied).</exception>
     /// <exception cref="ArgumentException">The supplied connectionString is not valid.</exception>
-    /// <exception cref="SqlException">Thrown when the connection to the master database fails or when the command fails to execute.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="retryCount" /> is less than 0 or
+    /// when <paramref name="intervalBetweenRetriesInMilliseconds" /> is less than or equal to 0.
+    /// </exception>
+    /// <exception cref="SqlException">Thrown when the connection to the master database fails or when the command fails to execute and the retry count exceeds.</exception>
     public static async Task<bool> TryDropDatabaseAsync(string connectionString,
                                                         int retryCount = 3,
                                                         int intervalBetweenRetriesInMilliseconds = 750,
@@ -105,11 +135,22 @@ public static class Database
     }
 
     /// <summary>
+    /// <para>
     /// Creates the database for the specified connection string. If it already exists, the
     /// database will be dropped and recreated. Connections to the existing database
     /// will be terminated. This method will connect to the "master" database of the target
     /// SQL server to do this - please ensure that the credentials in the connection string
     /// have enough privileges to perform this operation.
+    /// </para>
+    /// <para>
+    /// This method implements an automatic retry-strategy. It tries for three times and
+    /// waits for 750ms between each try. You can adjust the <paramref name="retryCount" />
+    /// and <paramref name="intervalBetweenRetriesInMilliseconds" /> parameters to adjust this behavior.
+    /// Furthermore, if you want to process the caught exceptions (e.g. for logging), you
+    /// can assign the <paramref name="processException" /> delegate. If you want to cancel
+    /// early, pass a corresponding <paramref name="cancellationToken" /> that times out
+    /// after a certain amount of time.
+    /// </para>
     /// </summary>
     /// <param name="connectionString">The connection string that identifies the target database.</param>
     /// <param name="retryCount">The number of retries this method will attempt to drop and create the database (optional). The default value is 3.</param>
@@ -125,7 +166,11 @@ public static class Database
     /// <exception cref="KeyNotFoundException">Invalid key name within the connection string.</exception>
     /// <exception cref="FormatException">Invalid value within the connection string (specifically, when a Boolean or numeric value was expected but not supplied).</exception>
     /// <exception cref="ArgumentException">The supplied connectionString is not valid.</exception>
-    /// <exception cref="SqlException">Thrown when the connection to the master database fails.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="retryCount" /> is less than 0 or
+    /// when <paramref name="intervalBetweenRetriesInMilliseconds" /> is less than or equal to 0.
+    /// </exception>
+    /// <exception cref="SqlException">Thrown when the connection to the master database fails or when the command fails to execute and the retry count exceeds.</exception>
     public static async Task DropAndCreateDatabaseAsync(string connectionString,
                                                         int retryCount = 3,
                                                         int intervalBetweenRetriesInMilliseconds = 750,
@@ -144,10 +189,10 @@ public static class Database
         await connectionToMaster.DropAndCreateDatabaseAsync(databaseName, retryCount, intervalBetweenRetriesInMilliseconds, processException, cancellationToken);
     }
 
-    private static (string connectionStringToMaster, DatabaseName databaseName) PrepareMasterConnectionAndDatabaseName(this string connectionString)
+    private static (string connectionStringToMaster, string databaseName) PrepareMasterConnectionAndDatabaseName(this string connectionString)
     {
         var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
-        DatabaseName databaseName = connectionStringBuilder.InitialCatalog;
+        string databaseName = connectionStringBuilder.InitialCatalog;
         connectionStringBuilder.InitialCatalog = "master";
         return (connectionStringBuilder.ConnectionString, databaseName);
     }
@@ -179,14 +224,24 @@ FROM sys.dm_exec_sessions
 WHERE database_id = db_id('{databaseName}') AND
       is_user_process = 1;
 
-EXEC(@kill);
-";
+EXEC(@kill);";
         return connectionToMaster.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
     }
 
     /// <summary>
+    /// <para>
     /// Execute a T-SQL command (non-query) that creates a new database. If the database
     /// already exists, it will be dropped and recreated.
+    /// </para>
+    /// <para>
+    /// This method implements an automatic retry-strategy. It tries for three times and
+    /// waits for 750ms between each try. You can adjust the <paramref name="retryCount" />
+    /// and <paramref name="intervalBetweenRetriesInMilliseconds" /> parameters to adjust this behavior.
+    /// Furthermore, if you want to process the caught exceptions (e.g. for logging), you
+    /// can assign the <paramref name="processException" /> delegate. If you want to cancel
+    /// early, pass a corresponding <paramref name="cancellationToken" /> that times out
+    /// after a certain amount of time.
+    /// </para>
     /// </summary>
     /// <param name="connectionToMaster">
     /// The SQL connection that will be used to execute the command.
@@ -209,7 +264,7 @@ EXEC(@kill);
     /// Thrown when <paramref name="retryCount" /> is less than 0 or
     /// when <paramref name="intervalBetweenRetriesInMilliseconds" /> is less than or equal to 0.
     /// </exception>
-    /// <exception cref="SqlException">Thrown when the command fails to execute, and the retry count is exceeded.</exception>
+    /// <exception cref="SqlException">Thrown when the command fails to execute, and the retry count exceeds.</exception>
     public static async Task DropAndCreateDatabaseAsync(this SqlConnection connectionToMaster,
                                                         DatabaseName databaseName,
                                                         int retryCount = 3,
@@ -227,12 +282,12 @@ EXEC(@kill);
         // These system process sessions cannot be killed. I introduced a retry strategy simply in the hope
         // of the system process disconnecting quickly enough so that a subsequent call to DROP Database and
         // CREATE DATABASE will succeed.
+        var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
 IF DB_ID('{databaseName}') IS NOT NULL
-DROP DATABASE {databaseName};
+DROP DATABASE {databaseIdentifier};
 
-CREATE DATABASE {databaseName};
-";
+CREATE DATABASE {databaseIdentifier};";
 
         var numberOfTries = 1;
         while (true)
@@ -261,7 +316,7 @@ CREATE DATABASE {databaseName};
     /// It must target the master database of a SQL server.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
-    /// <param name="retryCount">The number of retries this method will attempt to drop and create the database (optional). The default value is 3.</param>
+    /// <param name="retryCount">The number of retries this method will attempt to drop the database (optional). The default value is 3.</param>
     /// <param name="intervalBetweenRetriesInMilliseconds">
     /// The number of milliseconds the method will wait (using Task.Delay) after an exception has occurred (optional).
     /// The default value is 750ms.
@@ -274,7 +329,7 @@ CREATE DATABASE {databaseName};
     /// <returns>True when the database was dropped, otherwise false.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
-    /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
+    /// <exception cref="SqlException">Thrown when the command fails to execute, and the retry count exceeds.</exception>
     public static async Task<bool> TryDropDatabaseAsync(this SqlConnection connectionToMaster,
                                                         DatabaseName databaseName,
                                                         int retryCount = 3,
@@ -287,9 +342,10 @@ CREATE DATABASE {databaseName};
         retryCount.MustBeGreaterThanOrEqualTo(0);
         intervalBetweenRetriesInMilliseconds.MustBeGreaterThan(0);
 
+        var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
 IF DB_ID('{databaseName}') IS NOT NULL
-DROP DATABASE {databaseName};
+DROP DATABASE {databaseIdentifier};
 ";
 
         var numberOfTries = 1;
@@ -312,14 +368,25 @@ DROP DATABASE {databaseName};
     }
 
     /// <summary>
+    /// <para>
     /// Executes a T-SQL command (non-query) that creates a database if it does not exist.
+    /// </para>
+    /// <para>
+    /// This method implements an automatic retry-strategy. It tries for three times and
+    /// waits for 750ms between each try. You can adjust the <paramref name="retryCount" />
+    /// and <paramref name="intervalBetweenRetriesInMilliseconds" /> parameters to adjust this behavior.
+    /// Furthermore, if you want to process the caught exceptions (e.g. for logging), you
+    /// can assign the <paramref name="processException" /> delegate. If you want to cancel
+    /// early, pass a corresponding <paramref name="cancellationToken" /> that times out
+    /// after a certain amount of time.
+    /// </para>
     /// </summary>
     /// <param name="connectionToMaster">
     /// The SQL connection that will be used to execute the command.
     /// It must target the master database of a SQL server.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
-    /// <param name="retryCount">The number of retries this method will attempt to drop and create the database (optional). The default value is 3.</param>
+    /// <param name="retryCount">The number of retries this method will attempt to create the database (optional). The default value is 3.</param>
     /// <param name="intervalBetweenRetriesInMilliseconds">
     /// The number of milliseconds the method will wait (using Task.Delay) after an exception has occurred (optional).
     /// The default value is 750ms.
@@ -332,7 +399,11 @@ DROP DATABASE {databaseName};
     /// <returns>True when the database was created, otherwise false.</returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
-    /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when <paramref name="retryCount" /> is less than 0 or
+    /// when <paramref name="intervalBetweenRetriesInMilliseconds" /> is less than or equal to 0.
+    /// </exception>
+    /// <exception cref="SqlException">Thrown when the command fails to execute, and the retry count exceeds.</exception>
     public static async Task<bool> TryCreateDatabaseAsync(this SqlConnection connectionToMaster,
                                                           DatabaseName databaseName,
                                                           int retryCount = 3,
@@ -345,9 +416,10 @@ DROP DATABASE {databaseName};
         retryCount.MustBeGreaterThanOrEqualTo(0);
         intervalBetweenRetriesInMilliseconds.MustBeGreaterThan(0);
 
+        var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
 IF DB_ID('{databaseName}') IS NULL
-CREATE DATABASE {databaseName};
+CREATE DATABASE {databaseIdentifier};
 ";
 
         var numberOfTries = 1;

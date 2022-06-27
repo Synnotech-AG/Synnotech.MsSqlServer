@@ -54,6 +54,60 @@ public static class SqlEscaping
     }
 
     /// <summary>
+    /// Checks and normalizes the specified database name. This method removes white space and
+    /// checks if the database name contains only valid characters. Additionally, it indicates
+    /// whether the name should be escaped when used as an identifier in T-SQL scripts.
+    /// </summary>
+    /// <param name="databaseName">The database name to be validated.</param>
+    /// <returns>
+    /// A tuple containing the normalized name and the boolean indicator whether
+    /// the name should be escaped when used as a T-SQL identifier.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="databaseName" /> is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="databaseName" /> is an empty string or contains only white space, when it has more than 123 characters
+    /// after being trimmed, or when it contains invalid characters.
+    /// </exception>
+    public static (string normalizedName, bool requiresEscaping) AnalyzeDatabaseName(string databaseName)
+    {
+        databaseName.MustNotBeNullOrWhiteSpace();
+
+        var span = databaseName.AsSpan().Trim();
+        if (span.Length > 123)
+            Throw.Argument(nameof(databaseName), $"The specified database name \"{span.ToString()}\" is too long. The maximum length is restricted to 123 characters.");
+
+        var firstCharacter = span[0];
+        if (!Advanced.IsValidCharacter(firstCharacter))
+            Throw.Argument(nameof(databaseName), $"The specified database name \"{span.ToString()}\" contains invalid characters. It must only consist of letters, digits, or the characters '@', '$', '#', '_', ' ', '-' or '.'");
+        var requiresEscaping = !Advanced.IsValidFirstCharacterForDatabaseName(firstCharacter);
+
+        if (span.Length == 1)
+        {
+            if (databaseName.Length > 1)
+                databaseName = span.ToString();
+
+            return (databaseName, requiresEscaping);
+        }
+
+        for (var i = 1; i < span.Length; i++)
+        {
+            var character = span[i];
+            if (!requiresEscaping)
+                requiresEscaping = !Advanced.IsValidSubsequentIdentifierCharacter(character);
+            if (!Advanced.IsValidCharacter(character))
+                Throw.Argument(nameof(databaseName), $"The specified database name \"{span.ToString()}\" contains invalid characters. It must only consist of letters, digits, or the characters '@', '$', '#', '_', ' ', '-' or '.'");
+        }
+
+        if (databaseName.Length > span.Length)
+            databaseName = span.ToString();
+
+        if (!requiresEscaping && SqlKeywords.IsKeyword(databaseName))
+            requiresEscaping = true;
+
+        return (databaseName, requiresEscaping);
+    }
+
+    /// <summary>
     /// Provides advanced helper functions for escaping strings for T-SQL.
     /// </summary>
     public static class Advanced
@@ -106,6 +160,28 @@ public static class SqlEscaping
             span[span.Length - 1] = ']';
             identifier.AsSpan().CopyTo(span.Slice(1));
             return span.ToString();
+        }
+
+        /// <summary>
+        /// Checks if the character is a valid character for a SQL Server identifier.
+        /// All letters and digits are allowed, as well as and the characters
+        /// '@', '$', '#', '_', ' ', '-', and '.'
+        /// </summary>
+        public static bool IsValidCharacter(char character)
+        {
+            switch (character)
+            {
+                case '@':
+                case '$':
+                case '#':
+                case '_':
+                case ' ':
+                case '-':
+                case '.':
+                    return true;
+                default:
+                    return character.IsLetterOrDigit();
+            }
         }
     }
 }

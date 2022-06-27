@@ -10,6 +10,7 @@ namespace Synnotech.MsSqlServer;
 public readonly struct DatabaseName : IEquatable<DatabaseName>
 {
     private readonly string _databaseName;
+    private readonly bool _requiresEscaping;
 
     /// <summary>
     /// Initializes a new instance of <see cref="DatabaseName" />.
@@ -20,10 +21,15 @@ public readonly struct DatabaseName : IEquatable<DatabaseName>
     /// Thrown when <paramref name="databaseName" /> is an empty string or contains only white space, when it has more than 123 characters
     /// after being trimmed, or when it contains invalid characters.
     /// </exception>
-    public DatabaseName(string databaseName)
-    {
-        _databaseName = SqlEscaping.CheckAndNormalizeDatabaseName(databaseName);
-    }
+    public DatabaseName(string databaseName) =>
+        (_databaseName, _requiresEscaping) = SqlEscaping.AnalyzeDatabaseName(databaseName);
+
+    /// <summary>
+    /// Gets the database name as a string that can be used as a T-SQL identifier.
+    /// The database name will be padded with brackets if necessary.
+    /// </summary>
+    public string Identifier => 
+        _requiresEscaping ? SqlEscaping.Advanced.PadWithBrackets(_databaseName) : _databaseName;
 
     /// <summary>
     /// Checks if the specified instance is equal to this one.
