@@ -30,7 +30,7 @@ public sealed class DatabaseNameTests
     {
         var databaseName = new DatabaseName(validName);
 
-        databaseName.ToString().Should().Be(expectedName);
+        databaseName.Identifier.Should().Be(expectedName);
     }
 
     [Theory]
@@ -71,6 +71,6 @@ public sealed class DatabaseNameTests
     {
         DatabaseName databaseName = name;
 
-        databaseName.ToString().Should().Be(expectedName);
+        databaseName.Identifier.Should().Be(expectedName);
     }
 }

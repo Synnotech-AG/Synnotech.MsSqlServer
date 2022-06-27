@@ -77,6 +77,8 @@ public static class SqlEscaping
             Throw.Argument(nameof(databaseName), $"The specified database name \"{span.ToString()}\" is too long. The maximum length is restricted to 123 characters.");
 
         var firstCharacter = span[0];
+        if (!Advanced.IsValidCharacter(firstCharacter))
+            Throw.Argument(nameof(databaseName), $"The specified database name \"{span.ToString()}\" contains invalid characters. It must only consist of letters, digits, or the characters '@', '$', '#', '_', ' ', '-' or '.'");
         var requiresEscaping = !Advanced.IsValidFirstCharacterForDatabaseName(firstCharacter);
 
         if (span.Length == 1)
@@ -98,6 +100,9 @@ public static class SqlEscaping
 
         if (databaseName.Length > span.Length)
             databaseName = span.ToString();
+
+        if (!requiresEscaping && SqlKeywords.IsKeyword(databaseName))
+            requiresEscaping = true;
 
         return (databaseName, requiresEscaping);
     }

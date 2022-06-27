@@ -12,7 +12,6 @@ public sealed class InvalidDatabaseIdentifiers : TheoryData<string>
         Add(string.Empty); // Empty String
         Add(null!); // null
         Add("\t\r\n"); // white space
-        Add("Invalid Name"); // White space in between
-        Add("Other$Invalid§Special?Characters"); // White space in between
+        Add("Other$Invalid§Special?Characters");
     }
 }
