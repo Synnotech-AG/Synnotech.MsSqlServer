@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using Light.GuardClauses;
 
 namespace Synnotech.MsSqlServer;
 
@@ -6,14 +7,28 @@ namespace Synnotech.MsSqlServer;
 /// Represents a data structure that encapsulates a database name and
 /// the physical file paths of the MDF and the LDF file.
 /// </summary>
-/// <param name="DatabaseName">The name of the database.</param>
-/// <param name="FilePaths">The list of physical files that belong to the database.</param>
-public readonly record struct DatabasePhysicalFilesInfo(DatabaseName DatabaseName,
-                                                        List<DatabaseFileInfo> FilePaths);
+/// 
+public readonly record struct DatabasePhysicalFilesInfo
+{
+    /// <summary>
+    /// Initializes a new instance of <see cref="DatabasePhysicalFilesInfo" />.
+    /// </summary>
+    /// <param name="databaseName">The name of the database.</param>
+    /// <param name="files">The list of physical files that belong to the database.</param>
+    public DatabasePhysicalFilesInfo(DatabaseName databaseName,
+                                     List<DatabaseFileInfo> files)
+    {
+        DatabaseName = databaseName.MustNotBeDefault();
+        Files = files.MustNotBeNullOrEmpty();
+    }
 
-/// <summary>
-/// Represents information about a single physical file that belongs to a SQL Server database.
-/// </summary>
-/// <param name="Type">The type of the file. Typical values are ROWS for MDF files or LOG for LDF files.</param>
-/// <param name="PhysicalFilePath">The path to the physical file.</param>
-public readonly record struct DatabaseFileInfo(string Type, string PhysicalFilePath);
+    /// <summary>
+    /// Gets the name of the database.
+    /// </summary>
+    public DatabaseName DatabaseName { get; }
+
+    /// <summary>
+    /// Gets the list of files that belong to the database.
+    /// </summary>
+    public List<DatabaseFileInfo> Files { get; }
+}
