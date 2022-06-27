@@ -4,7 +4,7 @@
 [![Synnotech Logo](synnotech-large-logo.png)](https://www.synnotech.de/)
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://github.com/Synnotech-AG/Synnotech.MsSqlServer/blob/main/LICENSE)
-[![NuGet](https://img.shields.io/badge/NuGet-2.0.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
+[![NuGet](https://img.shields.io/badge/NuGet-3.0.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
 
 # How to Install
 
@@ -12,7 +12,7 @@ Synnotech.MsSqlServer is compiled against [.NET Standard 2.0 and 2.1](https://do
 
 Synnotech.MsSqlServer is available as a [NuGet package](https://www.nuget.org/packages/Synnotech.MsSqlServer/) and can be installed via:
 
-- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="2.0.0" />`
+- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="3.0.0" />`
 - **dotnet CLI**: `dotnet add package Synnotech.MsSqlServer`
 - **Visual Studio Package Manager Console**: `Install-Package Synnotech.MsSqlServer`
 
@@ -260,12 +260,64 @@ await connection.ExecuteNonQueryAsync(
 
 Finally, both of the overloads support `CancellationToken`.
 
+## Detaching and Attaching Databases
+
+In scenarios where you want to process the MDF and LDF files of a SQL Server database directly (e.g. when moving to another server), you usually have to detach and attach the corresponding files. This can be easily done with the `Database.DetachDatabaseAsync` and `Database.AttachDatabaseAsync` methods.
+
+```csharp
+// The following statement detaches the database and returns a struct that contains
+// information about the database name and the associated physical file paths
+// (usually one MDF and one LDF file).
+var databaseFilesInfo = await Database.DetachDatabaseAsync(connectionString);
+
+// You can now use do the stuff you like with the MDF files, e.g. moving them to another
+// server, ZIPPING them for redistribution, etc. In this example, we copy them to another
+// folder:
+foreach (var fileInfo in databaseInfo.Files)
+{
+    var sourceFileName = Path.GetFileName(fileInfo.PhysicalFilePath);
+    var targetFilePath = Path.Combine(targetFolder, sourceFileName);
+    File.Copy(fileInfo.PhysicalFilePath, targetFilePath);
+}
+
+// Afterwards, you can re-attach the database. If you want to change the
+// server, simply provide another connection string.
+await Database.AttachDatabaseAsync(connectionString, databaseFilesInfo);
+```
+
 ## Database Name Escaping
 
-For most things, the `SqlCommand` provides parameters that will be properly escaped when executing queries or DML statements. However, DDL statements usually do not support parameters. You can manually escape database identifiers by using the `SqlEscaping.CheckAndNormalizeDatabaseName` function. Alternatively, you can use the `DatabaseName` struct to encapsulate an escaped database identifier. The identifiers are escaped according to the [official rules of SQL Server](https://docs.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers?view=sql-server-ver15#rules-for-regular-identifiers).
+For most things, the `SqlCommand` provides parameters that will be properly escaped when executing queries or DML statements. However, DDL statements usually do not support parameters.You can simply create a `DatabaseName` instance from a string which will automatically check and trim the database name. You can then use the raw name e.g. in T-SQL strings by calling `ToString`, or use `Database.Identifier` to include the potentially escaped name directly in T-SQL scripts.
+
+```csharp
+public static Task DropDatabaseAsync(string databaseName)
+{
+    // This will trim and check the database name. It will throw if the value is invalid.
+    var parsedName = new DatabaseName(databaseName);
+
+    // You can then safely use the parsed name in your dynamically created DDL statements.
+    // Use parsedName directly in T-SQL strings, and use .Identifier to get a potentially
+    // escaped version of the database name for direct use in T-SQL scripts.
+    var sql = $@"
+IF DB_ID('{parsedName}') IS NOT NULL
+    DROP DATABASE {parsedName.Identifier}";
+
+    return Database.ExecuteNonQueryAsync(sql);
+}
+```
+
+You can also manually escape database identifiers by using the `SqlEscaping.CheckAndNormalizeDatabaseName` function (which ensures that the database name is compatible with the [official rules of SQL Server](https://docs.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers?view=sql-server-ver15#rules-for-regular-identifiers)).
 
 ## Migration Guide
 
 ### From 1.1.0 to 2.0.0
 
 Version 2.0.0 uses [System.Data.SqlClient](https://www.nuget.org/packages/System.Data.SqlClient/) instead of [Microsoft.Data.SqlClient](https://www.nuget.org/packages/Microsoft.Data.SqlClient/). This allows you to use spatial types and `SqlHierarchyId` in .NET Core and .NET 5/6 projects via [dotmortem.Microsoft.SqlServer.Types](https://github.com/dotMorten/Microsoft.SqlServer.Types). You simply need to recompile to make this work.
+
+### From 2.0.0 to 3.0.0
+
+Version 3.0.0 adds optional retry parameters to methods where it makes sense (e.g. `DropAndCreateDatabaseAsync`). The default is three retries with an interval of 750ms between each try. You can customize the behavior by setting the `retryCount` and `intervalBetweenRetriesInMilliseconds` parameters. If you want to process the catched exceptions, use the `processException` parameter where you can pass a delegate. This delegate is always called, even when the exception is rethrown.
+
+Additionally, the `DatabaseName` structure now allows non-standard names for databases. Names that contain spaces and/or hyphens are now allowed. You must distinguish between the normal `ToString` call which returns the raw database name for T-SQL strings, and the `DatabaseName.Identifier` property which applies brackets to the identifier if necessary (see section Database Name Escaping).
+
+Simply recompiling with the new version is enough to properly upgrade to the new package version.
