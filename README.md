@@ -4,7 +4,7 @@
 [![Synnotech Logo](synnotech-large-logo.png)](https://www.synnotech.de/)
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://github.com/Synnotech-AG/Synnotech.MsSqlServer/blob/main/LICENSE)
-[![NuGet](https://img.shields.io/badge/NuGet-3.0.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
+[![NuGet](https://img.shields.io/badge/NuGet-3.1.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
 
 # How to Install
 
@@ -12,7 +12,7 @@ Synnotech.MsSqlServer is compiled against [.NET Standard 2.0 and 2.1](https://do
 
 Synnotech.MsSqlServer is available as a [NuGet package](https://www.nuget.org/packages/Synnotech.MsSqlServer/) and can be installed via:
 
-- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="3.0.0" />`
+- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="3.1.0" />`
 - **dotnet CLI**: `dotnet add package Synnotech.MsSqlServer`
 - **Visual Studio Package Manager Console**: `Install-Package Synnotech.MsSqlServer`
 
