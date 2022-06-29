@@ -5,7 +5,7 @@
         <Authors>Synnotech AG</Authors>
         <Company>Synnotech AG</Company>
         <Copyright>Copyright © Synnotech AG 2021</Copyright>
-        <Version>3.0.0</Version>
+        <Version>3.1.0</Version>
         <Description>Provides common functionality for database access to MS SQL Server.</Description>
         <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
         <LangVersion>10.0</LangVersion>
@@ -22,12 +22,11 @@
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReleaseNotes>
-Synntech.MsSqlServer 3.0.0
+Synntech.MsSqlServer 3.1.0
 --------------------------------
 
-- breaking change: introduced new optional parameters to TryCreateDatabaseAsync, TryDropDatabaseAsync, DropAndCreateDatabaseAsync. These methods now perform retries when they cannot be executed successfully (up to 3 times, 750ms delay between retries).
-- breaking change: the DatabaseName structure now allows non-standard names that must be escaped with brackets. Use DatabaseName.Identifier to get the escaped name, the normal ToString method returns the raw database name.
-- new feature: added DetachDatabaseAsync and AttachDatabaseAsync
+- New feature: SetSingleUserAsync - this method changes a database's state to allow only a single user to be connected. This method is executed with ROLLBACK IMMEDIATE.
+- DetachDatabaseAsync now calls SetSingleUserAsync internally instead of KillAllDatabaseConnectionsAsync
 - you can read the full docs at https://github.com/Synnotech-AG/Synnotech.MsSqlServer
         </PackageReleaseNotes>
     </PropertyGroup>
