@@ -67,7 +67,7 @@ public static partial class Database
 #endif
             await OpenConnectionAsync(masterConnectionString, cancellationToken);
 
-        await masterConnection.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
+        await masterConnection.SetSingleUserAsync(databaseName, cancellationToken);
         await masterConnection.DetachDatabaseAsync(databaseName,
                                                    retryCount,
                                                    intervalBetweenRetriesInMilliseconds,

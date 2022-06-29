@@ -5,6 +5,7 @@ using System.Data.SqlClient;
 using System.Threading;
 using System.Threading.Tasks;
 using Light.GuardClauses;
+using Light.GuardClauses.Exceptions;
 
 namespace Synnotech.MsSqlServer;
 
@@ -192,19 +193,19 @@ public static partial class Database
     private static (string connectionStringToMaster, string databaseName) PrepareMasterConnectionAndDatabaseName(this string connectionString)
     {
         var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
-        string databaseName = connectionStringBuilder.InitialCatalog;
+        var databaseName = connectionStringBuilder.InitialCatalog;
         connectionStringBuilder.InitialCatalog = "master";
         return (connectionStringBuilder.ConnectionString, databaseName);
     }
 
     /// <summary>
-    /// Execute a T-SQL command (non-query) that kills all active connections to the database
+    /// Executes a T-SQL command (non-query) that kills all active connections to the database
     /// with the specified name. It is safe to run this command when the target database does
     /// not exist.
     /// </summary>
     /// <param name="connectionToMaster">
     /// The SQL connection that will be used to execute the command.
-    /// It must target the master database of a SQL server.
+    /// It must target the master database of a SQL server and already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
@@ -213,8 +214,8 @@ public static partial class Database
     /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
     public static Task KillAllDatabaseConnectionsAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
     {
-        connectionToMaster.MustNotBeNull(nameof(connectionToMaster));
-        databaseName.MustNotBeDefault(nameof(databaseName));
+        connectionToMaster.MustNotBeNull();
+        databaseName.MustNotBeDefault();
 
         // This statement concatenates strings of the form "kill <session_id>;".
         var sql = $@"
@@ -225,6 +226,30 @@ WHERE database_id = db_id('{databaseName}') AND
       is_user_process = 1;
 
 EXEC(@kill);";
+        return connectionToMaster.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
+    }
+
+    /// <summary>
+    /// Executes a T-SQL command (non-query) that changes the state of a database to only allow
+    /// a single user to be connected at the same time.
+    /// </summary>
+    /// <param name="connectionToMaster">
+    /// The SQL connection that will be used to execute the command.
+    /// It must target the master database of a SQL server and already be open.
+    /// </param>
+    /// <param name="databaseName">The name of the target database.</param>
+    /// <param name="cancellationToken">The cancellation instruction (optional).</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
+    /// <exception cref="ArgumentDefaultException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
+    /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
+    public static Task SetSingleUserAsync(this SqlConnection connectionToMaster,
+                                          DatabaseName databaseName,
+                                          CancellationToken cancellationToken = default)
+    {
+        connectionToMaster.MustNotBeNull();
+        databaseName.MustNotBeDefault();
+
+        var sql = $"ALTER DATABASE {databaseName.Identifier} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;";
         return connectionToMaster.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
     }
 
@@ -383,7 +408,7 @@ DROP DATABASE {databaseIdentifier};
     /// </summary>
     /// <param name="connectionToMaster">
     /// The SQL connection that will be used to execute the command.
-    /// It must target the master database of a SQL server.
+    /// It must target the master database of a SQL server and already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="retryCount">The number of retries this method will attempt to create the database (optional). The default value is 3.</param>

@@ -12,6 +12,15 @@ public static class AttachAndDetachTests
     {
         var connectionString = TestSettings.GetConnectionStringOrSkip();
         await Database.DropAndCreateDatabaseAsync(connectionString);
+        const string databaseSetup = @"
+CREATE TABLE Foo (
+    Id INT IDENTITY(1, 1) CONSTRAINT PK_Foo PRIMARY KEY,
+    Value NVARCHAR(100) NOT NULL
+);
+
+INSERT INTO Foo (Value) VALUES ('Bar');
+INSERT INTO Foo (Value) VALUES ('Baz');";
+        await Database.ExecuteNonQueryAsync(connectionString, databaseSetup);
 
         var databaseInfo = await Database.DetachDatabaseAsync(connectionString);
         var temporaryFolder = Path.GetTempPath();
