@@ -18,7 +18,7 @@ public static partial class Database
     /// <para>
     /// Tries to create the database the specified connection string points to. If
     /// the target database already exists, nothing will be done.
-    /// This method will connect to the "master" database of the target
+    /// This method will connect to the default database that is configured for the user on the target
     /// SQL server to do this - please ensure that the credentials in the connection string
     /// have enough privileges to perform this operation.
     /// </para>
@@ -58,20 +58,20 @@ public static partial class Database
                                                           Action<SqlException>? processException = null,
                                                           CancellationToken cancellationToken = default)
     {
-        var (connectionStringToMaster, databaseName) = connectionString.PrepareMasterConnectionAndDatabaseName();
+        var (connectionStringToMaster, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
 
 #if NETSTANDARD2_0
-        using var connectionToMaster =
+        using var defaultConnection =
 #else
-        await using var connectionToMaster =
+        await using var defaultConnection =
 #endif
             await OpenConnectionAsync(connectionStringToMaster, cancellationToken);
 
-        return await connectionToMaster.TryCreateDatabaseAsync(databaseName,
-                                                               retryCount,
-                                                               intervalBetweenRetriesInMilliseconds,
-                                                               processException,
-                                                               cancellationToken);
+        return await defaultConnection.TryCreateDatabaseAsync(databaseName,
+                                                              retryCount,
+                                                              intervalBetweenRetriesInMilliseconds,
+                                                              processException,
+                                                              cancellationToken);
     }
 
     /// <summary>
@@ -79,7 +79,7 @@ public static partial class Database
     /// Tries to drop the database the specified connection string points to. All existing
     /// connections to the database will be terminated. If the database does not exist, nothing
     /// will happen.
-    /// This method will connect to the "master" database of the target
+    /// This method will connect to the the default database that is configured for the user on the target
     /// SQL server to do this - please ensure that the credentials in the connection string
     /// have enough privileges to perform this operation.
     /// </para>
@@ -119,27 +119,27 @@ public static partial class Database
                                                         Action<SqlException>? processException = null,
                                                         CancellationToken cancellationToken = default)
     {
-        var (connectionStringToMaster, databaseName) = connectionString.PrepareMasterConnectionAndDatabaseName();
+        var (connectionStringToMaster, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
 #if NETSTANDARD2_0
-        using var connectionToMaster =
+        using var defaultConnection =
 #else
-        await using var connectionToMaster =
+        await using var defaultConnection =
 #endif
             await OpenConnectionAsync(connectionStringToMaster, cancellationToken);
 
-        await connectionToMaster.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
-        return await connectionToMaster.TryDropDatabaseAsync(databaseName,
-                                                             retryCount,
-                                                             intervalBetweenRetriesInMilliseconds,
-                                                             processException,
-                                                             cancellationToken);
+        await defaultConnection.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
+        return await defaultConnection.TryDropDatabaseAsync(databaseName,
+                                                            retryCount,
+                                                            intervalBetweenRetriesInMilliseconds,
+                                                            processException,
+                                                            cancellationToken);
     }
 
     /// <summary>
     /// <para>
     /// Creates the database for the specified connection string. If it already exists, the
     /// database will be dropped and recreated. Connections to the existing database
-    /// will be terminated. This method will connect to the "master" database of the target
+    /// will be terminated. This method will connect to the default database that is configured for the user on the target
     /// SQL server to do this - please ensure that the credentials in the connection string
     /// have enough privileges to perform this operation.
     /// </para>
@@ -178,23 +178,23 @@ public static partial class Database
                                                         Action<SqlException>? processException = null,
                                                         CancellationToken cancellationToken = default)
     {
-        var (connectionStringToMaster, databaseName) = connectionString.PrepareMasterConnectionAndDatabaseName();
+        var (connectionStringToMaster, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
 #if NETSTANDARD2_0
-        using var connectionToMaster =
+        using var defaultConnection =
 #else
-        await using var connectionToMaster =
+        await using var defaultConnection =
 #endif
             await OpenConnectionAsync(connectionStringToMaster, cancellationToken);
 
-        await connectionToMaster.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
-        await connectionToMaster.DropAndCreateDatabaseAsync(databaseName, retryCount, intervalBetweenRetriesInMilliseconds, processException, cancellationToken);
+        await defaultConnection.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
+        await defaultConnection.DropAndCreateDatabaseAsync(databaseName, retryCount, intervalBetweenRetriesInMilliseconds, processException, cancellationToken);
     }
 
-    private static (string connectionStringToMaster, string databaseName) PrepareMasterConnectionAndDatabaseName(this string connectionString)
+    private static (string connectionStringToMaster, string databaseName) PrepareDefaultConnectionAndDatabaseName(this string connectionString)
     {
         var connectionStringBuilder = new SqlConnectionStringBuilder(connectionString);
         var databaseName = connectionStringBuilder.InitialCatalog;
-        connectionStringBuilder.InitialCatalog = "master";
+        connectionStringBuilder.InitialCatalog = string.Empty;
         return (connectionStringBuilder.ConnectionString, databaseName);
     }
 
@@ -203,18 +203,18 @@ public static partial class Database
     /// with the specified name. It is safe to run this command when the target database does
     /// not exist.
     /// </summary>
-    /// <param name="connectionToMaster">
+    /// <param name="connection">
     /// The SQL connection that will be used to execute the command.
     /// It must target the master database of a SQL server and already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
     /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
-    public static Task KillAllDatabaseConnectionsAsync(this SqlConnection connectionToMaster, DatabaseName databaseName, CancellationToken cancellationToken = default)
+    public static Task KillAllDatabaseConnectionsAsync(this SqlConnection connection, DatabaseName databaseName, CancellationToken cancellationToken = default)
     {
-        connectionToMaster.MustNotBeNull();
+        connection.MustNotBeNull();
         databaseName.MustNotBeDefault();
 
         // This statement concatenates strings of the form "kill <session_id>;".
@@ -226,31 +226,31 @@ WHERE database_id = db_id('{databaseName}') AND
       is_user_process = 1;
 
 EXEC(@kill);";
-        return connectionToMaster.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
+        return connection.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
     }
 
     /// <summary>
     /// Executes a T-SQL command (non-query) that changes the state of a database to only allow
     /// a single user to be connected at the same time.
     /// </summary>
-    /// <param name="connectionToMaster">
+    /// <param name="connection">
     /// The SQL connection that will be used to execute the command.
     /// It must target the master database of a SQL server and already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster"/> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection"/> is null.</exception>
     /// <exception cref="ArgumentDefaultException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
     /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
-    public static Task SetSingleUserAsync(this SqlConnection connectionToMaster,
+    public static Task SetSingleUserAsync(this SqlConnection connection,
                                           DatabaseName databaseName,
                                           CancellationToken cancellationToken = default)
     {
-        connectionToMaster.MustNotBeNull();
+        connection.MustNotBeNull();
         databaseName.MustNotBeDefault();
 
         var sql = $"ALTER DATABASE {databaseName.Identifier} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;";
-        return connectionToMaster.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
+        return connection.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
     }
 
     /// <summary>

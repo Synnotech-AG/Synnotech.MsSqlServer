@@ -19,7 +19,7 @@ public static partial class Database
     /// database to be attached (in this case, the name in the connection string is preferred).
     /// </para>
     /// <para>
-    /// This method will connect to the "master" database of the target
+    /// This method will connect to the default database that is configured for the user on the target
     /// SQL server to do this - please ensure that the credentials in the connection string
     /// have enough privileges to perform this operation.
     /// </para>
@@ -38,23 +38,23 @@ public static partial class Database
     {
         databaseFilesInfo.MustNotBeDefault();
 
-        var (masterConnectionString, databaseNameFromConnectionString) = PrepareMasterConnectionAndDatabaseName(connectionString);
+        var (defaultConnectionString, databaseNameFromConnectionString) = PrepareDefaultConnectionAndDatabaseName(connectionString);
         var databaseName = SelectDatabaseName(databaseNameFromConnectionString, databaseFilesInfo.DatabaseName);
 
 #if NETSTANDARD2_0
-        using var masterConnection =
+        using var defaultConnection =
 #else
-        await using var masterConnection =
+        await using var defaultConnection =
 #endif
-            await OpenConnectionAsync(masterConnectionString, cancellationToken);
+            await OpenConnectionAsync(defaultConnectionString, cancellationToken);
 
-        await masterConnection.AttachDatabaseAsync(databaseName, databaseFilesInfo.Files, cancellationToken);
+        await defaultConnection.AttachDatabaseAsync(databaseName, databaseFilesInfo.Files, cancellationToken);
     }
 
     /// <summary>
     /// Attaches a database to a SQL server.
     /// </summary>
-    /// <param name="connectionToMaster">The SQL connection that is connected to the master database of the SQL server. This connection must already be opened.</param>
+    /// <param name="connectionToMaster">The SQL connection that is connected to the master (or default) database of the SQL server. This connection must already be opened.</param>
     /// <param name="databaseName">The name of the database that should be attached.</param>
     /// <param name="databaseFiles">The physical paths to the database files that will be used to attach the database.</param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
