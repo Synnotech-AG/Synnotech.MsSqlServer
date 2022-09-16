@@ -27,7 +27,7 @@ public static partial class Database
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionString" /> or <paramref name="sql" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when either <paramref name="connectionString" /> or <paramref name="sql" /> is an empty string or contains only white space.</exception>
-    /// <exception cref="SqlException">Thrown when any I/O errors with MS SQL Server occur.</exception>
+    /// <exception cref="SqlException">Thrown when any I/O errors occur with MS SQL Server.</exception>
     public static async Task<int> ExecuteNonQueryAsync(string connectionString,
                                                        string sql,
                                                        Action<SqlCommand>? configureCommand = null,
@@ -61,7 +61,7 @@ public static partial class Database
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="openConnection" /> or <paramref name="sql" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="sql" /> is an empty string or contains only white space.</exception>
-    /// <exception cref="SqlException">Thrown when any I/O errors with MS SQL Server occur.</exception>
+    /// <exception cref="SqlException">Thrown when any I/O errors occur with MS SQL Server.</exception>
     public static Task<int> ExecuteNonQueryAsync(this SqlConnection openConnection,
                                                  string sql,
                                                  Action<SqlCommand>? configureCommand = null,
@@ -125,9 +125,9 @@ public static partial class Database
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
     /// <typeparam name="T">The type that the scalar result should be cast to.</typeparam>
     /// <returns>The scalar return</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionString"/> or <paramref name="sql"/> are null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionString" /> or <paramref name="sql" /> are null.</exception>
     /// <exception cref="ArgumentException">Thrown when the <paramref name="connectionString" /> is invalid.</exception>
-    /// <exception cref="SqlException">Thrown when any I/O errors with MS SQL Server occur.</exception>
+    /// <exception cref="SqlException">Thrown when any I/O errors occur with MS SQL Server.</exception>
     public static async Task<T> ExecuteScalarAsync<T>(string connectionString,
                                                       string sql,
                                                       Action<SqlCommand>? configureCommand = null,
@@ -152,7 +152,8 @@ public static partial class Database
     /// <param name="sql">The SQL statement that should be executed.</param>
     /// <param name="configureCommand">
     /// The delegate that allows you to further configure the SQL command (optional).
-    /// You will probably want to use this to add parameters to the command.</param>
+    /// You will probably want to use this to add parameters to the command.
+    /// </param>
     /// <param name="transactionLevel">
     /// The value indicating whether the command is executed within a transaction (optional).
     /// If the value is not null, a transaction with the specified level will be created.
@@ -160,7 +161,7 @@ public static partial class Database
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="openConnection" /> or <paramref name="sql" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="sql" /> is an empty string or contains only white space.</exception>
-    /// <exception cref="SqlException">Thrown when any I/O errors with MS SQL Server occur.</exception>
+    /// <exception cref="SqlException">Thrown when any I/O errors occur with MS SQL Server.</exception>
     public static Task<T> ExecuteScalarAsync<T>(this SqlConnection openConnection,
                                                 string sql,
                                                 Action<SqlCommand>? configureCommand = null,
@@ -176,7 +177,7 @@ public static partial class Database
 
         return transactionLevel is null ?
                    command.ExecuteScalarAndDisposeAsync<T>(cancellationToken) :
-                   openConnection.ExecuteScalarCommandWithTransactionAndDisposeAsync<T>(command, cancellationToken);
+                   openConnection.ExecuteScalarCommandWithTransactionAndDisposeAsync<T>(command, transactionLevel.Value, cancellationToken);
     }
 
     private static async Task<T> ExecuteScalarAndDisposeAsync<T>(this SqlCommand command, CancellationToken cancellationToken)
@@ -191,14 +192,17 @@ public static partial class Database
         }
     }
 
-    private static async Task<T> ExecuteScalarCommandWithTransactionAndDisposeAsync<T>(this SqlConnection connection, SqlCommand command, CancellationToken cancellationToken)
+    private static async Task<T> ExecuteScalarCommandWithTransactionAndDisposeAsync<T>(this SqlConnection connection,
+                                                                                       SqlCommand command,
+                                                                                       IsolationLevel transactionLevel,
+                                                                                       CancellationToken cancellationToken)
     {
 #if NETSTANDARD2_0
         using var transaction =
 #else
         await using var transaction =
 #endif
-            connection.BeginTransaction();
+            connection.BeginTransaction(transactionLevel);
 
         command.Transaction = transaction;
 
@@ -209,6 +213,167 @@ public static partial class Database
 #endif
         {
             return (T) await command.ExecuteScalarAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>
+    /// Executes the specified SQL against the database that is targeted by the connection string.
+    /// The underlying SQL command will be called with ExecuteReaderAsync. You must provide
+    /// a delegate that deserializes the entries from the SQL data reader.
+    /// You can use the optional delegate to configure the command (to e.g. provide parameters).
+    /// </summary>
+    /// <param name="connectionString">The connection string that identifies the target database.</param>
+    /// <param name="sql">The SQL statements that should be executed against the database.</param>
+    /// <param name="deserializeAsync">The delegate that is used to deserialize the values provided by the SQL data reader.</param>
+    /// <param name="commandBehavior">
+    /// The command behavior value that is passed to ExecuteReaderAsync.
+    /// The default value is <see cref="CommandBehavior.SingleResult" />.
+    /// </param>
+    /// <param name="configureCommand">
+    /// The delegate that allows you to further configure the SQL command (optional).
+    /// You will probably want to use this to add parameters to the command.
+    /// </param>
+    /// <param name="transactionLevel">
+    /// The value indicating whether the command is executed within a transaction (optional).
+    /// If the value is not null, a transaction with the specified level will be created.
+    /// </param>
+    /// <param name="cancellationToken">The cancellation instruction (optional).</param>
+    /// <typeparam name="T">The type that the values of the SQL data reader will be parsed to.</typeparam>
+    /// <returns>The values parsed from the SQL data reader.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="connectionString" />, <paramref name="sql" />, or
+    /// <paramref name="deserializeAsync" /> are null.
+    /// </exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="sql" /> is empty or contains only white space.</exception>
+    /// <exception cref="SqlException">Thrown when any I/O errors occur with MS SQL Server.</exception>
+    public static async Task<T> ExecuteReaderAsync<T>(string connectionString,
+                                                      string sql,
+                                                      Func<SqlDataReader, CancellationToken, Task<T>> deserializeAsync,
+                                                      CommandBehavior commandBehavior = CommandBehavior.SingleResult,
+                                                      Action<SqlCommand>? configureCommand = null,
+                                                      IsolationLevel? transactionLevel = null,
+                                                      CancellationToken cancellationToken = default)
+    {
+#if NETSTANDARD2_0
+        using var connection =
+#else
+        await using var connection =
+#endif
+            await OpenConnectionAsync(connectionString, cancellationToken);
+
+        return await connection.ExecuteReaderAsync(sql,
+                                                   deserializeAsync,
+                                                   commandBehavior,
+                                                   configureCommand,
+                                                   transactionLevel,
+                                                   cancellationToken);
+    }
+
+    /// <summary>
+    /// Executes the specified SQL against the target database.
+    /// The underlying SQL command will be called with ExecuteReaderAsync. You must provide
+    /// a delegate that deserializes the entries from the SQL data reader.
+    /// You can use the optional delegate to configure the command (to e.g. provide parameters).
+    /// </summary>
+    /// <param name="openConnection">The SQL connection to the target database. This connection must already be open.</param>
+    /// <param name="sql">The SQL statements that should be executed against the database.</param>
+    /// <param name="deserializeAsync">The delegate that is used to deserialize the values provided by the SQL data reader.</param>
+    /// <param name="commandBehavior">
+    /// The command behavior value that is passed to ExecuteReaderAsync.
+    /// The default value is <see cref="CommandBehavior.SingleResult" />.
+    /// </param>
+    /// <param name="configureCommand">
+    /// The delegate that allows you to further configure the SQL command (optional).
+    /// You will probably want to use this to add parameters to the command.
+    /// </param>
+    /// <param name="transactionLevel">
+    /// The value indicating whether the command is executed within a transaction (optional).
+    /// If the value is not null, a transaction with the specified level will be created.
+    /// </param>
+    /// <param name="cancellationToken">The cancellation instruction (optional).</param>
+    /// <typeparam name="T">The type that the values of the SQL data reader will be parsed to.</typeparam>
+    /// <returns>The values parsed from the SQL data reader.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="openConnection" />, <paramref name="sql" />, or
+    /// <paramref name="deserializeAsync" /> are null.
+    /// </exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="sql" /> is empty or contains only white space.</exception>
+    /// <exception cref="SqlException">Thrown when any I/O errors occur with MS SQL Server.</exception>
+    public static Task<T> ExecuteReaderAsync<T>(this SqlConnection openConnection,
+                                                string sql,
+                                                Func<SqlDataReader, CancellationToken, Task<T>> deserializeAsync,
+                                                CommandBehavior commandBehavior = CommandBehavior.SingleResult,
+                                                Action<SqlCommand>? configureCommand = null,
+                                                IsolationLevel? transactionLevel = null,
+                                                CancellationToken cancellationToken = default)
+    {
+        openConnection.MustNotBeNull();
+        sql.MustNotBeNullOrWhiteSpace();
+        deserializeAsync.MustNotBeNull();
+
+        var command = openConnection.CreateCommand();
+        command.CommandText = sql;
+        configureCommand?.Invoke(command);
+
+        return transactionLevel is null ?
+                   command.ExecuteReaderAndDeserializeAsync(deserializeAsync, commandBehavior, cancellationToken) :
+                   openConnection.ExecuteReaderWithTransactionAndDeserializeAsync(command,
+                                                                                  deserializeAsync,
+                                                                                  transactionLevel.Value,
+                                                                                  commandBehavior,
+                                                                                  cancellationToken);
+    }
+
+    private static async Task<T> ExecuteReaderAndDeserializeAsync<T>(this SqlCommand command,
+                                                                     Func<SqlDataReader, CancellationToken, Task<T>> deserializeAsync,
+                                                                     CommandBehavior commandBehavior,
+                                                                     CancellationToken cancellationToken)
+    {
+#if NETSTANDARD2_0
+        using (command)
+#else
+        await using (command)
+#endif
+        {
+#if NETSTANDARD2_0
+            using var reader =
+#else
+            await using var reader =
+#endif
+                await command.ExecuteReaderAsync(commandBehavior, cancellationToken);
+
+            return await deserializeAsync(reader, cancellationToken);
+        }
+    }
+
+    private static async Task<T> ExecuteReaderWithTransactionAndDeserializeAsync<T>(this SqlConnection connection,
+                                                                                    SqlCommand command,
+                                                                                    Func<SqlDataReader, CancellationToken, Task<T>> deserializeAsync,
+                                                                                    IsolationLevel transactionLevel,
+                                                                                    CommandBehavior commandBehavior,
+                                                                                    CancellationToken cancellationToken)
+    {
+#if NETSTANDARD2_0
+        using var transaction =
+#else
+        await using var transaction =
+#endif
+            connection.BeginTransaction(transactionLevel);
+
+#if NETSTANDARD2_0
+        using (command)
+#else
+        await using (command)
+#endif
+        {
+#if NETSTANDARD2_0
+            using var reader =
+#else
+            await using var reader =
+#endif
+                await command.ExecuteReaderAsync(commandBehavior, cancellationToken);
+
+            return await deserializeAsync(reader, cancellationToken);
         }
     }
 }
