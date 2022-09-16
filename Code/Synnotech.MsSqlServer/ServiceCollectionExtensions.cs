@@ -2,6 +2,8 @@
 using System.Data.SqlClient;
 using Light.GuardClauses;
 using Microsoft.Extensions.DependencyInjection;
+using Synnotech.Core.DependencyInjection;
+using Synnotech.Core.Initialization;
 using Synnotech.DatabaseAbstractions;
 
 namespace Synnotech.MsSqlServer;
@@ -40,15 +42,16 @@ public static class ServiceCollectionExtensions
     /// </param>
     /// <param name="factoryLifetime">The lifetime for the session factory. It's usually ok for them to be a singleton.</param>
     /// <param name="registerCreateSessionDelegate">
-    /// The value indicating whether a Func&lt;TAbstraction> is also registered with the DI container (optional).
-    /// This factory delegate is necessary for the <see cref="SessionFactory{T}" /> to work properly. The default value is true.
+    /// The value indicating whether a Func&lt;TAbstraction> should also registered with the DI container (optional).
+    /// This factory delegate is necessary for the <see cref="SessionFactory{T}" /> to work properly. The default value is null,
+    /// so that it will fall back to Synnotech.Core's <see cref="ContainerSettings" />.
     /// You can set this value to false if you use a proper DI container like LightInject that offers function factories. https://www.lightinject.net/#function-factories
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="services" /> is null.</exception>
     public static IServiceCollection AddSessionFactoryFor<TAbstractSession, TConcreteSession>(this IServiceCollection services,
                                                                                               ServiceLifetime sessionLifetime = ServiceLifetime.Transient,
                                                                                               ServiceLifetime factoryLifetime = ServiceLifetime.Singleton,
-                                                                                              bool registerCreateSessionDelegate = true)
+                                                                                              bool? registerCreateSessionDelegate = null)
         where TAbstractSession : class, IAsyncReadOnlySession
         where TConcreteSession : class, TAbstractSession
     {
@@ -56,7 +59,7 @@ public static class ServiceCollectionExtensions
 
         services.Add(new ServiceDescriptor(typeof(TAbstractSession), typeof(TConcreteSession), sessionLifetime));
         services.Add(new ServiceDescriptor(typeof(ISessionFactory<TAbstractSession>), typeof(SessionFactory<TAbstractSession>), factoryLifetime));
-        if (registerCreateSessionDelegate)
+        if (ContainerSettingsContext.Settings.CheckIfFactoryDelegateShouldBeRegistered(registerCreateSessionDelegate))
             services.AddSingleton<Func<TAbstractSession>>(c => c.GetRequiredService<TAbstractSession>);
         return services;
     }

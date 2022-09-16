@@ -16,7 +16,7 @@ public static partial class Database
     /// about the physical file locations of the database.
     /// </para>
     /// <para>
-    /// This method will connect to the "master" database of the target
+    /// This method will connect to the default database that is configured for the user on the target
     /// SQL server to do this - please ensure that the credentials in the connection string
     /// have enough privileges to perform this operation.
     /// </para>
@@ -56,7 +56,7 @@ public static partial class Database
                                                                             Action<SqlException>? processException = null,
                                                                             CancellationToken cancellationToken = default)
     {
-        var (masterConnectionString, databaseName) = PrepareMasterConnectionAndDatabaseName(connectionString);
+        var (masterConnectionString, databaseName) = PrepareDefaultConnectionAndDatabaseName(connectionString);
 
         var info = await GetPhysicalFilesInfoAsync(connectionString, databaseName, cancellationToken);
 
@@ -91,7 +91,7 @@ public static partial class Database
     /// after a certain amount of time.
     /// </para>
     /// </summary>
-    /// <param name="connectionToMaster">The SQL connection that is connected to the master database of the SQL server. This connection must already be opened.</param>
+    /// <param name="connectionToMaster">The SQL connection that is connected to the master (or default) database of the SQL server. This connection must already be opened.</param>
     /// <param name="databaseName">The name of the database that should be detached.</param>
     /// <param name="retryCount">The number of retries this method will attempt to detach the database (optional). The default value is 3.</param>
     /// <param name="intervalBetweenRetriesInMilliseconds">
@@ -180,7 +180,7 @@ public static partial class Database
 #endif
             connection.CreateCommand();
         command.CommandText = @"
-SELECT type_desc Type,
+SELECT type_desc AS Type,
        physical_name PhysicalFilePath
 FROM sys.database_files;";
 

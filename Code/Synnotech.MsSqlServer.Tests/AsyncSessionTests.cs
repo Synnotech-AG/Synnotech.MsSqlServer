@@ -25,7 +25,7 @@ public static class AsyncSessionTests
         var connectionString = TestSettings.GetConnectionStringOrSkip();
 
         await Database.DropAndCreateDatabaseAsync(connectionString);
-        await Database.ExecuteNonQueryAsync(connectionString, Scripts.SimpleDatabaseScript);
+        await Database.ExecuteNonQueryAsync(connectionString, Scripts.SimpleDatabase);
 
         await using var container = new ServiceCollection().AddSqlConnection(connectionString)
                                                            .AddSessionFactoryFor<IUpdatePersonSession, SqlUpdatePersonSession>()
@@ -59,7 +59,7 @@ public static class AsyncSessionTests
         public async Task UpdatePersonAsync(Person person)
         {
             await using var command = CreateCommand();
-            command.CommandText = Scripts.UpdatePersonScript;
+            command.CommandText = Scripts.UpdatePerson;
             command.Parameters.Add("@Id", SqlDbType.Int).Value = person.Id;
             command.Parameters.Add("@Name", SqlDbType.NVarChar).Value = person.Name;
             command.Parameters.Add("@Age", SqlDbType.Int).Value = person.Age;
@@ -81,7 +81,7 @@ public static class AsyncSessionTests
         public async Task<Person?> GetPersonAsync(int id)
         {
             await using var command = CreateCommand();
-            command.CommandText = Scripts.GetPersonScript;
+            command.CommandText = Scripts.GetPerson;
             command.Parameters.Add("@Id", SqlDbType.Int).Value = id;
             await using var reader = await command.ExecuteReaderAsync();
             return await reader.DeserializePersonAsync();

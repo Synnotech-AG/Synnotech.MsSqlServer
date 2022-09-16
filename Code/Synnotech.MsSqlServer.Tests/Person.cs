@@ -5,13 +5,13 @@ using System.Threading.Tasks;
 
 namespace Synnotech.MsSqlServer.Tests;
 
-public sealed class Person
+public sealed record Person
 {
     public int Id { get; init; }
 
-    public string Name { get; set; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
 
-    public int Age { get; set; }
+    public int Age { get; init; }
 }
 
 public static class PersonExtensions
