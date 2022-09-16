@@ -5,7 +5,7 @@
         <Authors>Synnotech AG</Authors>
         <Company>Synnotech AG</Company>
         <Copyright>Copyright © Synnotech AG 2021</Copyright>
-        <Version>3.1.0</Version>
+        <Version>4.0.0</Version>
         <Description>Provides common functionality for database access to MS SQL Server.</Description>
         <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
         <LangVersion>10.0</LangVersion>
@@ -22,11 +22,12 @@
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReleaseNotes>
-Synntech.MsSqlServer 3.1.0
+Synntech.MsSqlServer 4.0.0
 --------------------------------
 
-- New feature: SetSingleUserAsync - this method changes a database's state to allow only a single user to be connected. This method is executed with ROLLBACK IMMEDIATE.
-- DetachDatabaseAsync now calls SetSingleUserAsync internally instead of KillAllDatabaseConnectionsAsync
+- new APIs: ExecuteScalarAsync and ExecuteReaderAsync
+- all database operations now use SET SINGLE_USER WITH ROLLBACK IMMEDIATE instead of killing existing user sessions
+- SessionFactory now works with the default implementation of Synnotech.Core
 - you can read the full docs at https://github.com/Synnotech-AG/Synnotech.MsSqlServer
         </PackageReleaseNotes>
     </PropertyGroup>
@@ -39,7 +40,7 @@ Synntech.MsSqlServer 3.1.0
         <PackageReference Include="Light.GuardClauses" Version="10.0.0" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="6.0.0" />
         <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="all" />
-        <PackageReference Include="IsExternalInit" Version="1.0.2" PrivateAssets="all" />
+        <PackageReference Include="IsExternalInit" Version="1.0.3" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>

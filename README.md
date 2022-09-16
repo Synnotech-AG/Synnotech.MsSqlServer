@@ -4,7 +4,7 @@
 [![Synnotech Logo](synnotech-large-logo.png)](https://www.synnotech.de/)
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://github.com/Synnotech-AG/Synnotech.MsSqlServer/blob/main/LICENSE)
-[![NuGet](https://img.shields.io/badge/NuGet-3.1.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
+[![NuGet](https://img.shields.io/badge/NuGet-4.0.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
 
 # How to Install
 
@@ -12,7 +12,7 @@ Synnotech.MsSqlServer is compiled against [.NET Standard 2.0 and 2.1](https://do
 
 Synnotech.MsSqlServer is available as a [NuGet package](https://www.nuget.org/packages/Synnotech.MsSqlServer/) and can be installed via:
 
-- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="3.1.0" />`
+- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="4.0.0" />`
 - **dotnet CLI**: `dotnet add package Synnotech.MsSqlServer`
 - **Visual Studio Package Manager Console**: `Install-Package Synnotech.MsSqlServer`
 
@@ -182,23 +182,22 @@ using Synnotech.Xunit
 using Synnotech.MsSqlServer;
 using Xunit;
 
-namespace MyTestProject
+namespace MyTestProject;
+
+public class MyDatabaseIntegrationTests
 {
-    public class MyDatabaseIntegrationTests
+    [SkippableFact]
+    public async Task RunAllMigrations()
     {
-        [SkippableFact]
-        public async Task RunAllMigrations()
-        {
-            Skip.IfNot(TestSettings.Configuration.GetValue<bool>("database:areTestsEnabled"));
-            
-            var connectionString = TestSettings.Configuration["database:connectionString"] ??
-                throw new InvalidOperationException("You must set connectionString when areTestsEnabled is set to true");           
-            await Database.DropAndCreateDatabaseAsync(connectionString);
-            
-            await using var connection = await Database.OpenConnectionAsync(connectionString);
-            
-            // Execute all your migrations and check if they were applied successfully
-        }
+        Skip.IfNot(TestSettings.Configuration.GetValue<bool>("database:areTestsEnabled"));
+        
+        var connectionString = TestSettings.Configuration["database:connectionString"] ??
+            throw new InvalidOperationException("You must set connectionString when areTestsEnabled is set to true");           
+        await Database.DropAndCreateDatabaseAsync(connectionString);
+        
+        await using var connection = await Database.OpenConnectionAsync(connectionString);
+        
+        // Execute all your migrations and check if they were applied successfully
     }
 }
 ```
@@ -207,7 +206,7 @@ A detailed description on how to set this up can be found [here](https://github.
 
 ## Easily Execute a SQL Command
 
-You can use the two overloads of `Database.ExecuteNonQueryAsync` to quickly apply SQL statements to the target database. This is most useful in integration tests where you want to apply a single SQL script to bring the database in a certain state before the actual test exercises the database.
+You can use `Database.ExecuteNonQueryAsync`, `Database.ExecuteScalarAsync`, and `Database.ExecuteReaderAsync` to quickly apply SQL statements to the target database. This is most useful in integration tests where you want to apply a single SQL script to bring the database in a certain state before the actual test exercises the database.
 
 ```csharp
 public class MyTestClass
@@ -258,7 +257,48 @@ await connection.ExecuteNonQueryAsync(
 );
 ```
 
-Finally, both of the overloads support `CancellationToken`.
+`ExecuteScalarAsync` and `ExecuteReaderAsync` work in a similar fashion. Here is an example for reading data from a SQL query:
+
+```csharp
+public static class ExecuteReaderAsyncTests
+{
+    [SkippableFact]
+    public static async Task ReadFromDatabase()
+    {
+        var connectionString = TestSettings.GetConnectionStringOrSkip();
+        await Database.DropAndCreateDatabaseAsync(connectionString);
+        await Database.ExecuteNonQueryAsync(connectionString, Scripts.SimpleDatabase);
+
+        var persons = await Database.ExecuteReaderAsync(connectionString,
+                                                        Scripts.GetPersons,
+                                                        DeserializePersons);
+
+        var expectedPersons = new List<Person>
+        {
+            new () { Id = 1, Name = "John Doe", Age = 42 },
+            new () { Id = 2, Name = "Helga Orlowski", Age = 29 },
+            new () { Id = 3, Name = "Bruno Hitchens", Age = 37 }
+        };
+        persons.Should().Equal(expectedPersons);
+    }
+
+    private static async Task<List<Person>> DeserializePersons(SqlDataReader reader, CancellationToken cancellationToken)
+    {
+        var persons = new List<Person>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            var id = reader.GetInt32(0);
+            var name = reader.GetString(1);
+            var age = reader.GetInt32(2);
+            persons.Add(new () { Id = id, Name = name, Age = age });
+        }
+
+        return persons;
+    }
+}
+```
+
+Finally, every of these methods supports cancellation tokens.
 
 ## Detaching and Attaching Databases
 
@@ -270,7 +310,7 @@ In scenarios where you want to process the MDF and LDF files of a SQL Server dat
 // (usually one MDF and one LDF file).
 var databaseFilesInfo = await Database.DetachDatabaseAsync(connectionString);
 
-// You can now use do the stuff you like with the MDF files, e.g. moving them to another
+// You can now access the physical files of a database, to e.g. move them to another
 // server, ZIPPING them for redistribution, etc. In this example, we copy them to another
 // folder:
 foreach (var fileInfo in databaseInfo.Files)
@@ -321,3 +361,10 @@ Version 3.0.0 adds optional retry parameters to methods where it makes sense (e.
 Additionally, the `DatabaseName` structure now allows non-standard names for databases. Names that contain spaces and/or hyphens are now allowed. You must distinguish between the normal `ToString` call which returns the raw database name for T-SQL strings, and the `DatabaseName.Identifier` property which applies brackets to the identifier if necessary (see section Database Name Escaping).
 
 Simply recompiling with the new version is enough to properly upgrade to the new package version.
+
+### From 3.x to 4.0.0
+
+Version 4.0.0 removes the `IInitializeAsync` interface and reuses the one from [Synnotech.Core](https://github.com/Synnotech-AG/Synnotech.core). The `SessionFactory<T>`
+now derives from `GenericAsyncFactory<T>` from Synnotech.Core to reuse its functionality. `AddSessionFactory` now relies internally on `ContainerSettingsContext` of Synnotech.Core to determine if create-session delegates should be registered.
+
+You probably won't notice any of these changes - a simple recompile should be enough after updating your NuGet package reference.
