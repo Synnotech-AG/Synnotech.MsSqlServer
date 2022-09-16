@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Data.SqlClient;
 using System.Threading;
 using System.Threading.Tasks;
@@ -58,14 +57,14 @@ public static partial class Database
                                                           Action<SqlException>? processException = null,
                                                           CancellationToken cancellationToken = default)
     {
-        var (connectionStringToMaster, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
+        var (defaultConnectionString, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
 
 #if NETSTANDARD2_0
         using var defaultConnection =
 #else
         await using var defaultConnection =
 #endif
-            await OpenConnectionAsync(connectionStringToMaster, cancellationToken);
+            await OpenConnectionAsync(defaultConnectionString, cancellationToken);
 
         return await defaultConnection.TryCreateDatabaseAsync(databaseName,
                                                               retryCount,
@@ -119,13 +118,13 @@ public static partial class Database
                                                         Action<SqlException>? processException = null,
                                                         CancellationToken cancellationToken = default)
     {
-        var (connectionStringToMaster, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
+        var (defaultConnectionString, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
 #if NETSTANDARD2_0
         using var defaultConnection =
 #else
         await using var defaultConnection =
 #endif
-            await OpenConnectionAsync(connectionStringToMaster, cancellationToken);
+            await OpenConnectionAsync(defaultConnectionString, cancellationToken);
 
         await defaultConnection.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
         return await defaultConnection.TryDropDatabaseAsync(databaseName,
@@ -178,13 +177,13 @@ public static partial class Database
                                                         Action<SqlException>? processException = null,
                                                         CancellationToken cancellationToken = default)
     {
-        var (connectionStringToMaster, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
+        var (defaultConnectionString, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
 #if NETSTANDARD2_0
         using var defaultConnection =
 #else
         await using var defaultConnection =
 #endif
-            await OpenConnectionAsync(connectionStringToMaster, cancellationToken);
+            await OpenConnectionAsync(defaultConnectionString, cancellationToken);
 
         await defaultConnection.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
         await defaultConnection.DropAndCreateDatabaseAsync(databaseName, retryCount, intervalBetweenRetriesInMilliseconds, processException, cancellationToken);
@@ -222,7 +221,7 @@ public static partial class Database
 DECLARE @kill varchar(1000) = '';
 SELECT @kill = @kill + 'kill ' + CONVERT(varchar(5), session_id) + ';'
 FROM sys.dm_exec_sessions
-WHERE database_id = db_id('{databaseName}') AND
+WHERE database_id = db_id('{databaseName.ToString()}') AND
       is_user_process = 1;
 
 EXEC(@kill);";
@@ -233,24 +232,24 @@ EXEC(@kill);";
     /// Executes a T-SQL command (non-query) that changes the state of a database to only allow
     /// a single user to be connected at the same time.
     /// </summary>
-    /// <param name="connection">
+    /// <param name="openConnection">
     /// The SQL connection that will be used to execute the command.
     /// It must target the master database of a SQL server and already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection"/> is null.</exception>
-    /// <exception cref="ArgumentDefaultException">Thrown when <paramref name="databaseName"/> is the default instance.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="openConnection" /> is null.</exception>
+    /// <exception cref="ArgumentDefaultException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
     /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
-    public static Task SetSingleUserAsync(this SqlConnection connection,
+    public static Task SetSingleUserAsync(this SqlConnection openConnection,
                                           DatabaseName databaseName,
                                           CancellationToken cancellationToken = default)
     {
-        connection.MustNotBeNull();
+        openConnection.MustNotBeNull();
         databaseName.MustNotBeDefault();
 
         var sql = $"ALTER DATABASE {databaseName.Identifier} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;";
-        return connection.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
+        return openConnection.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -309,7 +308,7 @@ EXEC(@kill);";
         // CREATE DATABASE will succeed.
         var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
-IF DB_ID('{databaseName}') IS NOT NULL
+IF DB_ID('{databaseName.ToString()}') IS NOT NULL
 DROP DATABASE {databaseIdentifier};
 
 CREATE DATABASE {databaseIdentifier};";
@@ -369,7 +368,7 @@ CREATE DATABASE {databaseIdentifier};";
 
         var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
-IF DB_ID('{databaseName}') IS NOT NULL
+IF DB_ID('{databaseName.ToString()}') IS NOT NULL
 DROP DATABASE {databaseIdentifier};
 ";
 
@@ -436,14 +435,14 @@ DROP DATABASE {databaseIdentifier};
                                                           Action<SqlException>? processException = null,
                                                           CancellationToken cancellationToken = default)
     {
-        connectionToMaster.MustNotBeNull(nameof(connectionToMaster));
-        databaseName.MustNotBeDefault(nameof(databaseName));
+        connectionToMaster.MustNotBeNull();
+        databaseName.MustNotBeDefault();
         retryCount.MustBeGreaterThanOrEqualTo(0);
         intervalBetweenRetriesInMilliseconds.MustBeGreaterThan(0);
 
         var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
-IF DB_ID('{databaseName}') IS NULL
+IF DB_ID('{databaseName.ToString()}') IS NULL
 CREATE DATABASE {databaseIdentifier};
 ";
 
@@ -467,106 +466,11 @@ CREATE DATABASE {databaseIdentifier};
     }
 
     /// <summary>
-    /// Executes the specified SQL against the database that is targeted by the connection string.
-    /// The underlying SQL command will be called with ExecuteNonQueryAsync.
-    /// You can use the optional delegate to configure the command (to e.g. provide parameters).
-    /// </summary>
-    /// <param name="connectionString">The connection string that identifies the target database.</param>
-    /// <param name="sql">The SQL statements that should be executed against the database.</param>
-    /// <param name="configureCommand">The delegate that allows you to further configure the SQL command (optional). You will probably want to use this to add parameters to the command.</param>
-    /// <param name="transactionLevel">
-    /// The value indicating whether the command is executed within a transaction (optional).
-    /// If the value is not null, a transaction with the specified level will be created.
-    /// </param>
-    /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionString" /> or <paramref name="sql" /> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown when either <paramref name="connectionString" /> or <paramref name="sql" /> is an empty string or contains only white space.</exception>
-    /// <exception cref="SqlException">Thrown when any I/O errors with MS SQL Server occur.</exception>
-    public static async Task<int> ExecuteNonQueryAsync(string connectionString,
-                                                       string sql,
-                                                       Action<SqlCommand>? configureCommand = null,
-                                                       IsolationLevel? transactionLevel = null,
-                                                       CancellationToken cancellationToken = default)
-    {
-        connectionString.MustNotBeNullOrWhiteSpace(nameof(connectionString));
-        sql.MustNotBeNullOrWhiteSpace(nameof(sql));
-
-#if NETSTANDARD2_0
-        using var connection =
-#else
-        await using var connection =
-#endif
-            await OpenConnectionAsync(connectionString, cancellationToken);
-
-        return await connection.ExecuteNonQueryAsync(sql, configureCommand, transactionLevel, cancellationToken);
-    }
-
-    /// <summary>
-    /// Executes the specified SQL against the database that is targeted by the connection string.
-    /// You can use the optional delegate to configure the command (to e.g. provide parameters).
-    /// </summary>
-    /// <param name="connection">The SQL connection to the target database.</param>
-    /// <param name="sql">The SQL statement that should be executed.</param>
-    /// <param name="configureCommand">The delegate that allows you to further configure the SQL command (optional). You will probably want to use this to add parameters to the command.</param>
-    /// <param name="transactionLevel">
-    /// The value indicating whether the command is executed within a transaction (optional).
-    /// If the value is not null, a transaction with the specified level will be created.
-    /// </param>
-    /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection" /> or <paramref name="sql" /> is null.</exception>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="sql" /> is an empty string or contains only white space.</exception>
-    /// <exception cref="SqlException">Thrown when any I/O errors with MS SQL Server occur.</exception>
-    public static Task<int> ExecuteNonQueryAsync(this SqlConnection connection,
-                                                 string sql,
-                                                 Action<SqlCommand>? configureCommand = null,
-                                                 IsolationLevel? transactionLevel = null,
-                                                 CancellationToken cancellationToken = default)
-    {
-        connection.MustNotBeNull(nameof(connection));
-        sql.MustNotBeNullOrWhiteSpace(nameof(sql));
-
-        var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.CommandType = CommandType.Text;
-        configureCommand?.Invoke(command);
-
-        return transactionLevel == null ?
-                   command.ExecuteNonQueryAndDisposeAsync(cancellationToken) :
-                   connection.ExecuteNonQueryWithTransactionAsync(command, transactionLevel.Value, cancellationToken);
-    }
-
-    private static async Task<int> ExecuteNonQueryAndDisposeAsync(this SqlCommand command, CancellationToken cancellationToken)
-    {
-#if NETSTANDARD2_0
-        using (command)
-#else
-        await using (command)
-#endif
-        {
-            return await command.ExecuteNonQueryAsync(cancellationToken);
-        }
-    }
-
-    private static async Task<int> ExecuteNonQueryWithTransactionAsync(this SqlConnection connection,
-                                                                       SqlCommand command,
-                                                                       IsolationLevel transactionLevel,
-                                                                       CancellationToken cancellationToken)
-    {
-#if NETSTANDARD2_0
-        using var transaction = connection.BeginTransaction(transactionLevel);
-#else
-        await using var transaction = (SqlTransaction) await connection.BeginTransactionAsync(transactionLevel, cancellationToken);
-#endif
-        command.Transaction = transaction;
-        return await command.ExecuteNonQueryAndDisposeAsync(cancellationToken);
-    }
-
-    /// <summary>
     /// Creates a new <see cref="SqlConnection" /> and opens it asynchronously.
     /// </summary>
     /// <param name="connectionString">The connection string that identifies the target database.</param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <exception cref="ArgumentException">Thrown when <paramref name="connectionString" /> is invalid.</exception>
+    /// <exception cref="ArgumentException">Thrown when the <paramref name="connectionString" /> is invalid.</exception>
     /// <exception cref="SqlException">Thrown when the connection cannot be established properly to Microsoft SQL Server.</exception>
     public static async Task<SqlConnection> OpenConnectionAsync(string connectionString, CancellationToken cancellationToken = default)
     {

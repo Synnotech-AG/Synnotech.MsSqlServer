@@ -25,7 +25,7 @@ public static class AsyncReadOnlySessionTests
         var connectionString = TestSettings.GetConnectionStringOrSkip();
 
         await Database.DropAndCreateDatabaseAsync(connectionString);
-        await Database.ExecuteNonQueryAsync(connectionString, Scripts.SimpleDatabaseScript);
+        await Database.ExecuteNonQueryAsync(connectionString, Scripts.SimpleDatabase);
 
 
         await using var container = new ServiceCollection().AddSqlConnection(connectionString)
@@ -58,7 +58,7 @@ public static class AsyncReadOnlySessionTests
         public async Task<List<Person>> GetPersonsAsync()
         {
             await using var command = SqlConnection.CreateCommand();
-            command.CommandText = Scripts.GetPersonsScript;
+            command.CommandText = Scripts.GetPersons;
             await using var reader = await command.ExecuteReaderAsync();
             return await reader.DeserializePersonsAsync();
         }

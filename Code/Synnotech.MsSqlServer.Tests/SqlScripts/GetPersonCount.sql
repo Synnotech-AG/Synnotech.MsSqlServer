@@ -1,0 +1,2 @@
+﻿SELECT COUNT(*)
+FROM Persons;
