@@ -2,6 +2,7 @@
 using System.Data.SqlClient;
 using Light.GuardClauses;
 using Microsoft.Extensions.DependencyInjection;
+using Synnotech.Core.Initialization;
 using Synnotech.DatabaseAbstractions;
 
 namespace Synnotech.MsSqlServer;
