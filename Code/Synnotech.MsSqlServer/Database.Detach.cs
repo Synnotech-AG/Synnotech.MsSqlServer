@@ -180,7 +180,7 @@ public static partial class Database
 #endif
             connection.CreateCommand();
         command.CommandText = @"
-SELECT type_desc Type,
+SELECT type_desc AS Type,
        physical_name PhysicalFilePath
 FROM sys.database_files;";
 
