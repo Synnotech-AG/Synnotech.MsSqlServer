@@ -11,7 +11,7 @@
         <LangVersion>10.0</LangVersion>
         <Nullable>enable</Nullable>
         <IsPackable>true</IsPackable>
-        <DocumentationFile>bin/$(Configuration)/$(TargetFramework)/$(AssemblyName).xml</DocumentationFile>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <PackageIcon>synnotech-logo.png</PackageIcon>
         <PackageProjectUrl>https://github.com/Synnotech-AG/Synnotech.MsSqlServer</PackageProjectUrl>
         <RepositoryUrl>https://github.com/Synnotech-AG/Synnotech.MsSqlServer.git</RepositoryUrl>
