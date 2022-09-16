@@ -1,10 +1,9 @@
 ﻿using System.Threading.Tasks;
-using Synnotech.Xunit;
+using FluentAssertions;
 using Xunit;
 
 namespace Synnotech.MsSqlServer.Tests;
 
-[TestCaseOrderer(TestOrderer.TypeName, TestOrderer.AssemblyName)]
 public static class DropAndCreateDatabaseTests
 {
     [SkippableFact]
@@ -13,7 +12,9 @@ public static class DropAndCreateDatabaseTests
         var connectionString = TestSettings.GetConnectionStringOrSkip();
         await Database.TryCreateDatabaseAsync(connectionString);
 
-        await Database.DropAndCreateDatabaseAsync(connectionString);
+        var result = await Database.DropAndCreateDatabaseAsync(connectionString);
+
+        result.Should().BeTrue();
     }
 
     [SkippableFact]
@@ -22,6 +23,8 @@ public static class DropAndCreateDatabaseTests
         var connectionString = TestSettings.GetConnectionStringOrSkip();
         await Database.TryDropDatabaseAsync(connectionString);
 
-        await Database.DropAndCreateDatabaseAsync(connectionString);
+        var result = await Database.DropAndCreateDatabaseAsync(connectionString);
+
+        result.Should().BeFalse();
     }
 }

@@ -4,7 +4,7 @@ namespace Synnotech.MsSqlServer;
 
 /// <summary>
 /// Represents a string value that is a valid SQL Server database identifier. This is
-/// done by calling <see cref="SqlEscaping.CheckAndNormalizeDatabaseName" />. The check is done
+/// done by calling <see cref="SqlEscaping.AnalyzeDatabaseName" />. The check is done
 /// according to the rules of https://docs.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers?view=sql-server-ver15#rules-for-regular-identifiers.
 /// </summary>
 public readonly struct DatabaseName : IEquatable<DatabaseName>

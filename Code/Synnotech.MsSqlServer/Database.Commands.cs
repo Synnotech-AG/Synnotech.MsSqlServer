@@ -188,7 +188,7 @@ public static partial class Database
         await using (command)
 #endif
         {
-            return (T) await command.ExecuteScalarAsync(cancellationToken);
+            return (await command.ExecuteScalarAsync(cancellationToken)).ConvertTo<T>();
         }
     }
 
@@ -212,7 +212,7 @@ public static partial class Database
         await using (command)
 #endif
         {
-            return (T) await command.ExecuteScalarAsync(cancellationToken);
+            return (await command.ExecuteScalarAsync(cancellationToken)).ConvertTo<T>();
         }
     }
 
@@ -376,4 +376,7 @@ public static partial class Database
             return await deserializeAsync(reader, cancellationToken);
         }
     }
+
+    private static T ConvertTo<T>(this object returnValue) =>
+        returnValue is DBNull or null ? default! : (T) returnValue;
 }

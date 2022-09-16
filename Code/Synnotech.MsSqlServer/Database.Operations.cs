@@ -163,6 +163,7 @@ public static partial class Database
     /// You would usually use this delegate to log the exception.
     /// </param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
+    /// <returns>True when the database was dropped before creation, else false.</returns>
     /// <exception cref="KeyNotFoundException">Invalid key name within the connection string.</exception>
     /// <exception cref="FormatException">Invalid value within the connection string (specifically, when a Boolean or numeric value was expected but not supplied).</exception>
     /// <exception cref="ArgumentException">The supplied connectionString is not valid.</exception>
@@ -171,11 +172,11 @@ public static partial class Database
     /// when <paramref name="intervalBetweenRetriesInMilliseconds" /> is less than or equal to 0.
     /// </exception>
     /// <exception cref="SqlException">Thrown when the connection to the master database fails or when the command fails to execute and the retry count exceeds.</exception>
-    public static async Task DropAndCreateDatabaseAsync(string connectionString,
-                                                        int retryCount = 3,
-                                                        int intervalBetweenRetriesInMilliseconds = 750,
-                                                        Action<SqlException>? processException = null,
-                                                        CancellationToken cancellationToken = default)
+    public static async Task<bool> DropAndCreateDatabaseAsync(string connectionString,
+                                                              int retryCount = 3,
+                                                              int intervalBetweenRetriesInMilliseconds = 750,
+                                                              Action<SqlException>? processException = null,
+                                                              CancellationToken cancellationToken = default)
     {
         var (defaultConnectionString, databaseName) = connectionString.PrepareDefaultConnectionAndDatabaseName();
 #if NETSTANDARD2_0
@@ -185,8 +186,11 @@ public static partial class Database
 #endif
             await OpenConnectionAsync(defaultConnectionString, cancellationToken);
 
-        await defaultConnection.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
-        await defaultConnection.DropAndCreateDatabaseAsync(databaseName, retryCount, intervalBetweenRetriesInMilliseconds, processException, cancellationToken);
+        return await defaultConnection.DropAndCreateDatabaseAsync(databaseName,
+                                                                  retryCount,
+                                                                  intervalBetweenRetriesInMilliseconds,
+                                                                  processException,
+                                                                  cancellationToken);
     }
 
     private static (string connectionStringToMaster, string databaseName) PrepareDefaultConnectionAndDatabaseName(this string connectionString)
@@ -202,18 +206,21 @@ public static partial class Database
     /// with the specified name. It is safe to run this command when the target database does
     /// not exist.
     /// </summary>
-    /// <param name="connection">
+    /// <param name="openConnection">
     /// The SQL connection that will be used to execute the command.
-    /// It must target the master database of a SQL server and already be open.
+    /// It must target a database that is fit to kill the connections
+    /// of the target database and it must already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connection" /> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="openConnection" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
     /// <exception cref="SqlException">Thrown when the command fails to execute.</exception>
-    public static Task KillAllDatabaseConnectionsAsync(this SqlConnection connection, DatabaseName databaseName, CancellationToken cancellationToken = default)
+    public static Task KillAllDatabaseConnectionsAsync(this SqlConnection openConnection,
+                                                       DatabaseName databaseName,
+                                                       CancellationToken cancellationToken = default)
     {
-        connection.MustNotBeNull();
+        openConnection.MustNotBeNull();
         databaseName.MustNotBeDefault();
 
         // This statement concatenates strings of the form "kill <session_id>;".
@@ -225,7 +232,7 @@ WHERE database_id = db_id('{databaseName.ToString()}') AND
       is_user_process = 1;
 
 EXEC(@kill);";
-        return connection.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
+        return openConnection.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -234,7 +241,8 @@ EXEC(@kill);";
     /// </summary>
     /// <param name="openConnection">
     /// The SQL connection that will be used to execute the command.
-    /// It must target the master database of a SQL server and already be open.
+    /// It must target a database that is fit to manipulate the state of
+    /// the target database and it must already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
@@ -267,9 +275,10 @@ EXEC(@kill);";
     /// after a certain amount of time.
     /// </para>
     /// </summary>
-    /// <param name="connectionToMaster">
+    /// <param name="openConnection">
     /// The SQL connection that will be used to execute the command.
-    /// It must target the master database of a SQL server.
+    /// It must target a database that is fit to drop and create other databases and
+    /// it must already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="retryCount">The number of retries this method will attempt to drop and create the database (optional). The default value is 3.</param>
@@ -282,44 +291,49 @@ EXEC(@kill);";
     /// You would usually use this delegate to log the exception.
     /// </param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
+    /// <returns>True when the database was dropped before creation, else false.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="openConnection" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when <paramref name="retryCount" /> is less than 0 or
     /// when <paramref name="intervalBetweenRetriesInMilliseconds" /> is less than or equal to 0.
     /// </exception>
     /// <exception cref="SqlException">Thrown when the command fails to execute, and the retry count exceeds.</exception>
-    public static async Task DropAndCreateDatabaseAsync(this SqlConnection connectionToMaster,
-                                                        DatabaseName databaseName,
-                                                        int retryCount = 3,
-                                                        int intervalBetweenRetriesInMilliseconds = 750,
-                                                        Action<SqlException>? processException = null,
-                                                        CancellationToken cancellationToken = default)
+    public static async Task<bool> DropAndCreateDatabaseAsync(this SqlConnection openConnection,
+                                                              DatabaseName databaseName,
+                                                              int retryCount = 3,
+                                                              int intervalBetweenRetriesInMilliseconds = 750,
+                                                              Action<SqlException>? processException = null,
+                                                              CancellationToken cancellationToken = default)
     {
-        connectionToMaster.MustNotBeNull();
+        openConnection.MustNotBeNull();
         databaseName.MustNotBeDefault();
         retryCount.MustBeGreaterThanOrEqualTo(0);
         intervalBetweenRetriesInMilliseconds.MustBeGreaterThan(0);
 
-        // Issue #5: https://github.com/Synnotech-AG/Synnotech.MsSqlServer/issues/5
-        // One user reported that a system process was attached to a database whose connections were killed.
-        // These system process sessions cannot be killed. I introduced a retry strategy simply in the hope
-        // of the system process disconnecting quickly enough so that a subsequent call to DROP Database and
-        // CREATE DATABASE will succeed.
         var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
-IF DB_ID('{databaseName.ToString()}') IS NOT NULL
-DROP DATABASE {databaseIdentifier};
+DECLARE @DbId INT;
 
-CREATE DATABASE {databaseIdentifier};";
+SELECT @DbId = DB_ID('{databaseName.ToString()}');
+
+IF @DbId IS NOT NULL
+BEGIN
+    ALTER DATABASE {databaseIdentifier} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE {databaseIdentifier};    
+END;
+
+CREATE DATABASE {databaseIdentifier};
+
+SELECT @DbId;";
 
         var numberOfTries = 1;
         while (true)
         {
             try
             {
-                await connectionToMaster.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
-                return;
+                var result = await openConnection.ExecuteScalarAsync<int?>(sql, cancellationToken: cancellationToken);
+                return result is not null;
             }
             catch (SqlException exception)
             {
@@ -335,9 +349,10 @@ CREATE DATABASE {databaseIdentifier};";
     /// <summary>
     /// Executes a T-SQL command (non-query) that drops a database if it exists.
     /// </summary>
-    /// <param name="connectionToMaster">
+    /// <param name="openConnection">
     /// The SQL connection that will be used to execute the command.
-    /// It must target the master database of a SQL server.
+    /// It must target a database that is fit to drop the target database and
+    /// it must already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="retryCount">The number of retries this method will attempt to drop the database (optional). The default value is 3.</param>
@@ -351,34 +366,42 @@ CREATE DATABASE {databaseIdentifier};";
     /// </param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
     /// <returns>True when the database was dropped, otherwise false.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="openConnection" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
     /// <exception cref="SqlException">Thrown when the command fails to execute, and the retry count exceeds.</exception>
-    public static async Task<bool> TryDropDatabaseAsync(this SqlConnection connectionToMaster,
+    public static async Task<bool> TryDropDatabaseAsync(this SqlConnection openConnection,
                                                         DatabaseName databaseName,
                                                         int retryCount = 3,
                                                         int intervalBetweenRetriesInMilliseconds = 750,
                                                         Action<SqlException>? processException = null,
                                                         CancellationToken cancellationToken = default)
     {
-        connectionToMaster.MustNotBeNull();
+        openConnection.MustNotBeNull();
         databaseName.MustNotBeDefault();
         retryCount.MustBeGreaterThanOrEqualTo(0);
         intervalBetweenRetriesInMilliseconds.MustBeGreaterThan(0);
 
         var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
-IF DB_ID('{databaseName.ToString()}') IS NOT NULL
-DROP DATABASE {databaseIdentifier};
-";
+DECLARE @DbId INT;
+
+SELECT @DbId = DB_ID('{databaseName.ToString()}');
+
+IF @DbId IS NOT NULL
+BEGIN
+    ALTER DATABASE {databaseIdentifier} SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+    DROP DATABASE {databaseIdentifier};    
+END;
+
+SELECT @DbId;";
 
         var numberOfTries = 1;
         while (true)
         {
             try
             {
-                var result = await connectionToMaster.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
-                return result == 1;
+                var result = await openConnection.ExecuteScalarAsync<int?>(sql, cancellationToken: cancellationToken);
+                return result is not null;
             }
             catch (SqlException exception)
             {
@@ -405,9 +428,10 @@ DROP DATABASE {databaseIdentifier};
     /// after a certain amount of time.
     /// </para>
     /// </summary>
-    /// <param name="connectionToMaster">
+    /// <param name="openConnection">
     /// The SQL connection that will be used to execute the command.
-    /// It must target the master database of a SQL server and already be open.
+    /// It must target a database that is fit to create the target database and
+    /// it must already be open.
     /// </param>
     /// <param name="databaseName">The name of the target database.</param>
     /// <param name="retryCount">The number of retries this method will attempt to create the database (optional). The default value is 3.</param>
@@ -421,38 +445,42 @@ DROP DATABASE {databaseIdentifier};
     /// </param>
     /// <param name="cancellationToken">The cancellation instruction (optional).</param>
     /// <returns>True when the database was created, otherwise false.</returns>
-    /// <exception cref="ArgumentNullException">Thrown when <paramref name="connectionToMaster" /> is null.</exception>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="openConnection" /> is null.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="databaseName" /> is the default instance.</exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when <paramref name="retryCount" /> is less than 0 or
     /// when <paramref name="intervalBetweenRetriesInMilliseconds" /> is less than or equal to 0.
     /// </exception>
     /// <exception cref="SqlException">Thrown when the command fails to execute, and the retry count exceeds.</exception>
-    public static async Task<bool> TryCreateDatabaseAsync(this SqlConnection connectionToMaster,
+    public static async Task<bool> TryCreateDatabaseAsync(this SqlConnection openConnection,
                                                           DatabaseName databaseName,
                                                           int retryCount = 3,
                                                           int intervalBetweenRetriesInMilliseconds = 750,
                                                           Action<SqlException>? processException = null,
                                                           CancellationToken cancellationToken = default)
     {
-        connectionToMaster.MustNotBeNull();
+        openConnection.MustNotBeNull();
         databaseName.MustNotBeDefault();
         retryCount.MustBeGreaterThanOrEqualTo(0);
         intervalBetweenRetriesInMilliseconds.MustBeGreaterThan(0);
 
         var databaseIdentifier = databaseName.Identifier;
         var sql = $@"
-IF DB_ID('{databaseName.ToString()}') IS NULL
-CREATE DATABASE {databaseIdentifier};
-";
+DECLARE @DbId INT;
+
+SELECT @DbId = DB_ID('{databaseName.ToString()}');
+
+IF @DbId IS NULL
+    CREATE DATABASE {databaseIdentifier};
+SELECT @DbId;";
 
         var numberOfTries = 1;
         while (true)
         {
             try
             {
-                var result = await connectionToMaster.ExecuteNonQueryAsync(sql, cancellationToken: cancellationToken);
-                return result == 1;
+                var result = await openConnection.ExecuteScalarAsync<int?>(sql, cancellationToken: cancellationToken);
+                return result is null;
             }
             catch (SqlException exception)
             {
