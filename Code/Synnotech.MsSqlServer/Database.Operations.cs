@@ -126,7 +126,6 @@ public static partial class Database
 #endif
             await OpenConnectionAsync(defaultConnectionString, cancellationToken);
 
-        await defaultConnection.KillAllDatabaseConnectionsAsync(databaseName, cancellationToken);
         return await defaultConnection.TryDropDatabaseAsync(databaseName,
                                                             retryCount,
                                                             intervalBetweenRetriesInMilliseconds,
@@ -202,9 +201,16 @@ public static partial class Database
     }
 
     /// <summary>
+    /// <para>
     /// Executes a T-SQL command (non-query) that kills all active connections to the database
     /// with the specified name. It is safe to run this command when the target database does
     /// not exist.
+    /// </para>
+    /// <para>
+    /// Prefer <see cref="SetSingleUserAsync" /> over this method as the latter only terminates
+    /// user sessions. SQL server system sessions might still be present and prevent e.g. dropping
+    /// the database after this method returned.
+    /// </para>
     /// </summary>
     /// <param name="openConnection">
     /// The SQL connection that will be used to execute the command.
