@@ -5,7 +5,7 @@
         <Authors>Synnotech AG</Authors>
         <Company>Synnotech AG</Company>
         <Copyright>Copyright © Synnotech AG 2021</Copyright>
-        <Version>4.0.0</Version>
+        <Version>4.1.0</Version>
         <Description>Provides common functionality for database access to MS SQL Server.</Description>
         <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Release'">true</TreatWarningsAsErrors>
         <LangVersion>10.0</LangVersion>
@@ -22,12 +22,10 @@
         <EmbedUntrackedSources>true</EmbedUntrackedSources>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <PackageReleaseNotes>
-Synntech.MsSqlServer 4.0.0
+Synntech.MsSqlServer 4.1.0
 --------------------------------
 
-- new APIs: ExecuteScalarAsync and ExecuteReaderAsync
-- all database operations now use SET SINGLE_USER WITH ROLLBACK IMMEDIATE instead of killing existing user sessions
-- SessionFactory now works with the default implementation of Synnotech.Core
+- new API: CheckIfDatabaseExistsAsync
 - you can read the full docs at https://github.com/Synnotech-AG/Synnotech.MsSqlServer
         </PackageReleaseNotes>
     </PropertyGroup>
