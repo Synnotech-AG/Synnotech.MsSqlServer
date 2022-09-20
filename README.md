@@ -4,15 +4,15 @@
 [![Synnotech Logo](synnotech-large-logo.png)](https://www.synnotech.de/)
 
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](https://github.com/Synnotech-AG/Synnotech.MsSqlServer/blob/main/LICENSE)
-[![NuGet](https://img.shields.io/badge/NuGet-4.0.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
+[![NuGet](https://img.shields.io/badge/NuGet-4.1.0-blue.svg?style=for-the-badge)](https://www.nuget.org/packages/Synnotech.MsSqlServer/)
 
 # How to Install
 
-Synnotech.MsSqlServer is compiled against [.NET Standard 2.0 and 2.1](https://docs.microsoft.com/en-us/dotnet/standard/net-standard) and thus supports all major plattforms like .NET 5, .NET Core, .NET Framework 4.6.1 or newer, Mono, Xamarin, UWP, or Unity.
+Synnotech.MsSqlServer is compiled against [.NET Standard 2.0 and 2.1](https://docs.microsoft.com/en-us/dotnet/standard/net-standard) and thus supports all major platforms like .NET 5, .NET Core, .NET Framework 4.6.1 or newer, Mono, Xamarin, UWP, or Unity.
 
 Synnotech.MsSqlServer is available as a [NuGet package](https://www.nuget.org/packages/Synnotech.MsSqlServer/) and can be installed via:
 
-- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="4.0.0" />`
+- **Package Reference in csproj**: `<PackageReference Include="Synnotech.MsSqlServer" Version="4.1.0" />`
 - **dotnet CLI**: `dotnet add package Synnotech.MsSqlServer`
 - **Visual Studio Package Manager Console**: `Install-Package Synnotech.MsSqlServer`
 
@@ -20,7 +20,7 @@ Synnotech.MsSqlServer is available as a [NuGet package](https://www.nuget.org/pa
 
 ## Async Sessions with ADO.NET
 
-As of version 2.0.0, Synnotech.MsSqlServer implements the `IAsyncSession` and `IAsyncReadOnlySession` from [Synnotech.DatabaseAbstractions](https://github.com/synnotech-AG/synnotech.DatabaseAbstractions). These allow you to make direct ADO.NET requests via a `SqlConnection` and `SqlCommand` through the forementioned abstractions. All async methods have full support for cancellation tokens.
+As of version 2.0.0, Synnotech.MsSqlServer implements the `IAsyncSession` and `IAsyncReadOnlySession` from [Synnotech.DatabaseAbstractions](https://github.com/synnotech-AG/synnotech.DatabaseAbstractions). These allow you to make direct ADO.NET requests via a `SqlConnection` and `SqlCommand` through the aforementioned abstractions. All async methods have full support for cancellation tokens.
 
 Consider the following abstraction for database access:
 
@@ -325,6 +325,18 @@ foreach (var fileInfo in databaseInfo.Files)
 await Database.AttachDatabaseAsync(connectionString, databaseFilesInfo);
 ```
 
+## Check if a Database Exists
+
+In some scenarios, you want to quickly check if a database exists. You can use the `Database.CheckIfDatabaseExistsAsync` method for that:
+
+```csharp
+var doesDatabaseExist = await Database.CheckIfDatabaseExistsAsync(connectionString, cancellationToken);
+if (doesDatabaseExist)
+    // you could create a backup here before updating the database
+```
+
+There is also an overload that uses an already open `SqlConnection` to perform this query.
+
 ## Database Name Escaping
 
 For most things, the `SqlCommand` provides parameters that will be properly escaped when executing queries or DML statements. However, DDL statements usually do not support parameters.You can simply create a `DatabaseName` instance from a string which will automatically check and trim the database name. You can then use the raw name e.g. in T-SQL strings by calling `ToString`, or use `Database.Identifier` to include the potentially escaped name directly in T-SQL scripts.
@@ -356,7 +368,7 @@ Version 2.0.0 uses [System.Data.SqlClient](https://www.nuget.org/packages/System
 
 ### From 2.0.0 to 3.0.0
 
-Version 3.0.0 adds optional retry parameters to methods where it makes sense (e.g. `DropAndCreateDatabaseAsync`). The default is three retries with an interval of 750ms between each try. You can customize the behavior by setting the `retryCount` and `intervalBetweenRetriesInMilliseconds` parameters. If you want to process the catched exceptions, use the `processException` parameter where you can pass a delegate. This delegate is always called, even when the exception is rethrown.
+Version 3.0.0 adds optional retry parameters to methods where it makes sense (e.g. `DropAndCreateDatabaseAsync`). The default is three retries with an interval of 750ms between each try. You can customize the behavior by setting the `retryCount` and `intervalBetweenRetriesInMilliseconds` parameters. If you want to process the caught exceptions, use the `processException` parameter where you can pass a delegate. This delegate is always called, even when the exception is rethrown.
 
 Additionally, the `DatabaseName` structure now allows non-standard names for databases. Names that contain spaces and/or hyphens are now allowed. You must distinguish between the normal `ToString` call which returns the raw database name for T-SQL strings, and the `DatabaseName.Identifier` property which applies brackets to the identifier if necessary (see section Database Name Escaping).
 
@@ -364,7 +376,6 @@ Simply recompiling with the new version is enough to properly upgrade to the new
 
 ### From 3.x to 4.0.0
 
-Version 4.0.0 removes the `IInitializeAsync` interface and reuses the one from [Synnotech.Core](https://github.com/Synnotech-AG/Synnotech.core). The `SessionFactory<T>`
-now derives from `GenericAsyncFactory<T>` from Synnotech.Core to reuse its functionality. `AddSessionFactory` now relies internally on `ContainerSettingsContext` of Synnotech.Core to determine if create-session delegates should be registered.
+Version 4.0.0 removes the `IInitializeAsync` interface and reuses the one from [Synnotech.Core](https://github.com/Synnotech-AG/Synnotech.core). The `SessionFactory<T>` now derives from `GenericAsyncFactory<T>` from Synnotech.Core to reuse its functionality. `AddSessionFactory` now relies internally on `ContainerSettingsContext` of Synnotech.Core to determine if create-session delegates should be registered.
 
 You probably won't notice any of these changes - a simple recompile should be enough after updating your NuGet package reference.
