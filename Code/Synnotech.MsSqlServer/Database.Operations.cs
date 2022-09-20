@@ -500,6 +500,56 @@ SELECT @DbId;";
     }
 
     /// <summary>
+    /// Executes a T-SQL query that checks if the database targeted by the specified connection
+    /// string exists.
+    /// </summary>
+    /// <param name="connectionString">The connection string that identifies the target database.</param>
+    /// <param name="cancellationToken">The cancellation instruction (optional).</param>
+    /// <returns>True if the database exists, else false.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the <paramref name="connectionString" /> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when the <paramref name="connectionString" /> contains no database/initial catalog.</exception>
+    /// <exception cref="SqlException">Thrown when any I/O error occurs with SQL Server.</exception>
+    public static async Task<bool> CheckIfDatabaseExistsAsync(string connectionString,
+                                                              CancellationToken cancellationToken = default)
+    {
+        var (defaultConnection, databaseName) = PrepareDefaultConnectionAndDatabaseName(connectionString);
+#if NETSTANDARD2_0
+        using var connection =
+#else
+        await using var connection =
+#endif
+            await OpenConnectionAsync(defaultConnection, cancellationToken);
+
+        return await connection.CheckIfDatabaseExistsAsync(databaseName, cancellationToken);
+    }
+
+    /// <summary>
+    /// Executes a T-SQL query that checks if a database with the specified database name exists.
+    /// </summary>
+    /// <param name="openConnection">
+    /// The SQL connection that will be used to execute the command.
+    /// It must target a database that is fit to call the T-SQL DB_ID function
+    /// with your specified database name.
+    /// </param>
+    /// <param name="databaseName">The name of the target database.</param>
+    /// <param name="cancellationToken">The cancellation instruction (optional).</param>
+    /// <returns>True if the database exists, else false.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when the <paramref name="openConnection" /> is null.</exception>
+    /// <exception cref="ArgumentException">Thrown when the <paramref name="databaseName" /> is the default instance.</exception>
+    /// <exception cref="SqlException">Thrown when any I/O error occurs with SQL Server.</exception>
+    public static async Task<bool> CheckIfDatabaseExistsAsync(this SqlConnection openConnection,
+                                                              DatabaseName databaseName,
+                                                              CancellationToken cancellationToken = default)
+    {
+        openConnection.MustNotBeNull();
+        databaseName.MustNotBeDefault();
+
+        var sql = $"SELECT DB_ID('{databaseName.ToString()}');";
+        var result = await openConnection.ExecuteScalarAsync<short?>(sql, cancellationToken: cancellationToken);
+        return result is not null;
+    }
+
+    /// <summary>
     /// Creates a new <see cref="SqlConnection" /> and opens it asynchronously.
     /// </summary>
     /// <param name="connectionString">The connection string that identifies the target database.</param>
